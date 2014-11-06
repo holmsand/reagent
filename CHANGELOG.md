@@ -1,6 +1,17 @@
 
 # Changelog
 
+## Upcoming
+
+- Arguments to components are now compared using simple `=`, instead of the old, rather complicated heuristics. **NOTE**: This means all arguments to a component function must be comparable with `=` (which means that they cannot be for example infinite `seq`s).
+
+- React updated to 0.12.0. Reagent now creates all React components using `React.createElement`.
+
+- `render-component` is now render, and `render-component-to-string` is `render-to-string`, in order to match React 0.12.0 (but the old names still work).
+
+- Add `render-to-static-markup`. This works exactly like `render-to-string`, except that it doesn't produce `data-react-id` etc.
+
+
 ## 0.4.3
 
 - React updated to 0.11.2

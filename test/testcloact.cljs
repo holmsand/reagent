@@ -332,3 +332,15 @@
                       (as-string [null-comp false]))))
     (is (re-find #"test-null-component"
                  (as-string [null-comp true])))))
+
+(deftest test-static-markup
+  (is (= "<div>foo</div>"
+         (reagent/render-to-static-markup
+          [:div "foo"])))
+  (is (= "<div class=\"bar\"><p>foo</p></div>"
+         (reagent/render-to-static-markup
+          [:div.bar [:p "foo"]])))
+  (is (= "<div class=\"bar\"><p>foobar</p></div>"
+         (reagent/render-to-static-markup
+          [:div.bar {:dangerously-set-inner-HTML
+                     {:__html "<p>foobar</p>"}} ]))))
