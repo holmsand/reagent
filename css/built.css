@@ -1,3 +1,238 @@
+
+* { 
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+
+.clearfix:before, .clearfix:after {
+    content: " ";
+    display: table;
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+div.nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+ul.nav {
+    margin: 0 auto;
+    width: 750px;
+    height: 40px;
+    padding-left: 60px;
+    padding-top: 10px;
+    list-style-type: none;
+}
+
+ul.nav > li {
+    float: left;
+    margin-right: 60px;
+}
+
+ul.nav > li > a {
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 11px;
+    color: #777;
+}
+
+ul.nav > li.brand > a {
+    color: #444;
+}
+
+@media (max-width: 768px) {
+    div.nav {
+        position: static;
+        background-color: #fff;
+    }
+    ul.nav {
+        width: 100%;
+        padding: 18px 27px;
+    }
+    ul.nav > li {
+        float: left;
+        margin-right: 30px;
+    }
+}
+
+.reagent-demo {
+    background-color: #fff;
+    margin: 60px -100px;
+    padding: 36px 60px;
+}
+
+.reagent-demo > h1 {
+    font-size: 48px;
+    color: #555;
+    font-family: 'HelveticaNeue-Light', 'Helvetica Neue', arial;
+    font-weight: normal;
+    line-height: 1.25em;
+    margin-top: 0.25em;
+    margin-bottom: 1em;
+}
+
+.reagent-demo > h1 > a {
+    color: inherit;
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    body {
+        width: auto;
+        margin: 0 0;
+    }
+    .reagent-demo {
+        margin: 0 0;
+        padding: 36px 27px;
+        width: 100%;
+    }
+    .github-badge {
+        display: none;
+    }
+    .demo-source {
+        overflow-x: scroll;
+    }
+    .test-output-mini {
+        display: none;
+    }
+}
+
+.test-output-mini {
+    text-align: right;
+    margin-right: -180px;
+}
+
+.reagent-demo h2 {
+    font-size: 20px;
+    line-height: 1.25em;
+    margin-top: 48px;
+    color: #555;
+}
+
+.demo-text > p, .demo-text > ul {
+    font-family: georgia, serif;
+    font-size: 18px;
+    line-height: 1.5em;
+    color: #444;
+}
+
+.demo-text > p > code, .demo-text > ul > li > code {
+    font-size: 17px;
+    color: #554;
+    background-color: #f6f6f2;
+    padding: 0 2px;
+}
+
+.demo-text > ul > li {
+    margin-bottom: 1em;
+}
+
+.demo-example {
+    background-color: #ebebeb;
+}
+
+.demo-source {
+    background-color: #f8f8f5;
+    color: #555;
+}
+
+.demo-example, .demo-source {
+    margin: 0px -22px;
+    padding: 22px 22px;
+}
+
+.simple-demo, .simple-demo input {
+    font-size: 18px;
+}
+
+.demo-heading {
+    margin-top: 0;
+    color: #999;
+    font-size: 14px;
+}
+
+.demo-example-hide {
+    float: right;
+    cursor: pointer;
+}
+
+.news-read-more {
+    text-decoration: none;
+    font-size: 16px;
+}
+
+/* Color demo */
+
+.color-plate {
+    float: left;
+    height: 100px;
+    width: 100px;
+}
+
+.color-slider > input {
+    width: 100%;
+}
+
+.color-samples {
+    clear: both;
+    padding-top: 0.5em;
+}
+
+/* Binary clock */
+
+.clock-main {
+    background: #333;
+    color: #cdcdcd;
+    padding-top: 55px;
+    padding-left: 20px;
+    float: left;
+    font-size: 28px;
+    line-height: 34px;
+    width: 620px;
+    cursor: pointer;
+}
+.clock-main.wide {
+    width: 790px;
+}
+.clock-cell {
+    width: 55px;
+    height: 55px;
+    text-align: center;
+    margin: 0 20px 20px 0;
+}
+.clock-cell.dark {
+    background-color: #454545;
+}
+.clock-cell.light {
+    background-color: #eee;
+}
+.clock-col {
+    margin: 0;
+    float: left;
+}
+.clock-legend > .clock-cell {
+    margin-top: 10px;
+}
+.clock-pair {
+    margin: 0;
+    float: left;
+}
+.clock-pair:not(:last-child) {
+    margin-right: 20px;
+    /* border-right: 1px solid #454545; */
+}
+\n/* Generated, do not modify */
+
+
+@charset "utf-8";
 html,
 body {
 	margin: 0;
@@ -555,26 +790,6 @@ hr {
 		margin: 130px auto 40px auto;
 	}
 }
-
-.todoitem-enter {
-    opacity: 0.1;
-    transition: opacity .2s ease-in;
-}
-
-.todoitem-enter.todoitem-enter-active {
-    opacity: 1;
-}
-
-.todoitem-leave {
-    opacity: 0.8;
-    transition: opacity 0.2s ease-out;
-}
-
-.todoitem-leave.todoitem-leave-active {
-    opacity: 0.1;
-}
-
-
 div, h1, input {
     font-family: HelveticaNeue, Helvetica;
     color: #777;
@@ -595,236 +810,4 @@ div, h1, input {
 .color-input, .color-input input {
     font-size: 24px;
     line-height: 1.5em;
-}
-
-
-* { 
-    -moz-box-sizing: border-box;
-    -webkit-box-sizing: border-box;
-    box-sizing: border-box;
-}
-
-
-.clearfix:before, .clearfix:after {
-    content: " ";
-    display: table;
-}
-
-.clearfix:after {
-    clear: both;
-}
-
-div.nav {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-}
-
-ul.nav {
-    margin: 0 auto;
-    width: 750px;
-    height: 40px;
-    padding-left: 60px;
-    padding-top: 10px;
-    list-style-type: none;
-}
-
-ul.nav > li {
-    float: left;
-    margin-right: 60px;
-}
-
-ul.nav > li > a {
-    text-decoration: none;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    font-size: 11px;
-    color: #777;
-}
-
-ul.nav > li.brand > a {
-    color: #444;
-}
-
-@media (max-width: 768px) {
-    div.nav {
-        position: static;
-        background-color: #fff;
-    }
-    ul.nav {
-        width: 100%;
-        padding: 18px 27px;
-    }
-    ul.nav > li {
-        float: left;
-        margin-right: 30px;
-    }
-}
-
-.reagent-demo {
-    background-color: #fff;
-    margin: 60px -100px;
-    padding: 36px 60px;
-}
-
-.reagent-demo > h1 {
-    font-size: 48px;
-    color: #555;
-    font-family: 'HelveticaNeue-Light', 'Helvetica Neue', arial;
-    font-weight: normal;
-    line-height: 1.25em;
-    margin-top: 0.25em;
-    margin-bottom: 1em;
-}
-
-.reagent-demo > h1 > a {
-    color: inherit;
-    text-decoration: none;
-}
-
-@media (max-width: 768px) {
-    body {
-        width: auto;
-        margin: 0 0;
-    }
-    .reagent-demo {
-        margin: 0 0;
-        padding: 36px 27px;
-        width: 100%;
-    }
-    .github-badge {
-        display: none;
-    }
-    .demo-source {
-        overflow-x: scroll;
-    }
-    .test-output-mini {
-        display: none;
-    }
-}
-
-.test-output-mini {
-    text-align: right;
-    margin-right: -180px;
-}
-
-.reagent-demo h2 {
-    font-size: 20px;
-    line-height: 1.25em;
-    margin-top: 48px;
-    color: #555;
-}
-
-.demo-text > p, .demo-text > ul {
-    font-family: georgia, serif;
-    font-size: 18px;
-    line-height: 1.5em;
-    color: #444;
-}
-
-.demo-text > p > code, .demo-text > ul > li > code {
-    font-size: 17px;
-    color: #554;
-    background-color: #f6f6f2;
-    padding: 0 2px;
-}
-
-.demo-text > ul > li {
-    margin-bottom: 1em;
-}
-
-.demo-example {
-    background-color: #ebebeb;
-}
-
-.demo-source {
-    background-color: #f8f8f5;
-    color: #555;
-}
-
-.demo-example, .demo-source {
-    margin: 0px -22px;
-    padding: 22px 22px;
-}
-
-.simple-demo, .simple-demo input {
-    font-size: 18px;
-}
-
-.demo-heading {
-    margin-top: 0;
-    color: #999;
-    font-size: 14px;
-}
-
-.demo-example-hide {
-    float: right;
-    cursor: pointer;
-}
-
-.news-read-more {
-    text-decoration: none;
-    font-size: 16px;
-}
-
-/* Color demo */
-
-.color-plate {
-    float: left;
-    height: 100px;
-    width: 100px;
-}
-
-.color-slider > input {
-    width: 100%;
-}
-
-.color-samples {
-    clear: both;
-    padding-top: 0.5em;
-}
-
-/* Binary clock */
-
-.clock-main {
-    background: #333;
-    color: #cdcdcd;
-    padding-top: 55px;
-    padding-left: 20px;
-    float: left;
-    font-size: 28px;
-    line-height: 34px;
-    width: 620px;
-    cursor: pointer;
-}
-.clock-main.wide {
-    width: 790px;
-}
-.clock-cell {
-    width: 55px;
-    height: 55px;
-    text-align: center;
-    margin: 0 20px 20px 0;
-}
-.clock-cell.dark {
-    background-color: #454545;
-}
-.clock-cell.light {
-    background-color: #eee;
-}
-.clock-col {
-    margin: 0;
-    float: left;
-}
-.clock-legend > .clock-cell {
-    margin-top: 10px;
-}
-.clock-pair {
-    margin: 0;
-    float: left;
-}
-.clock-pair:not(:last-child) {
-    margin-right: 20px;
-    /* border-right: 1px solid #454545; */
 }
