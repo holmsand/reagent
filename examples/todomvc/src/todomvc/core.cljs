@@ -22,10 +22,12 @@
                              (assoc-in m [k :done] x))
                            todos todos)))
 
-(defn app-handler [state [id x :as event]]
+(defn view-handler [state [id x :as event]]
   (case id
     (:edit :show) (assoc state id x)
     (update-in state [:todos] todo-handler event)))
+
+(def app-handler view-handler)
 
 (defn dispatch [event]
   ;; (js/console.log (str "Handling event: " event))
@@ -121,6 +123,3 @@
 
 (defn todo-app []
   [todo-main @todo-data])
-
-(defn ^:export run []
-  (r/render [todo-app] (js/document.getElementById "app")))
