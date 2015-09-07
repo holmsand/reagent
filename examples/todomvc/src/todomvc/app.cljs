@@ -12,9 +12,13 @@
 (defroute "/" [] (core/dispatch [:show :all]))
 (defroute show-path "/:id" [id] (core/dispatch [:show (keyword id)]))
 
-(defonce history
-  (doto (History.)
-    (events/listen etype/NAVIGATE #(secretary/dispatch! (.-token %)))))
+(defonce history nil)
+
+(defn init-history []
+  (when-not history
+    (doto (set! history (History.))
+      (events/listen etype/NAVIGATE #(secretary/dispatch! (.-token %)))
+      (.setEnabled true))))
 
 (defn nav-handler [state [id val]]
   (case id
@@ -47,9 +51,8 @@
       (nav-handler event)
       (write-local-storage)))
 
-(set! core/app-handler app-handler)
-
 (defn ^:export run []
+  (set! core/event-handler app-handler)
   (swap! core/todo-data read-local-storage)
-  (.setEnabled history true)
+  (init-history)
   (r/render [core/todo-app] (js/document.getElementById "app")))

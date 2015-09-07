@@ -27,11 +27,11 @@
     (:edit :show) (assoc state id x)
     (update-in state [:todos] todo-handler event)))
 
-(def app-handler view-handler)
+(def event-handler view-handler)
 
 (defn dispatch [event]
   ;; (js/console.log (str "Handling event: " event))
-  (swap! todo-data app-handler event))
+  (swap! todo-data event-handler event))
 
 
 ;;; Helper components
@@ -99,7 +99,7 @@
         pred (case show
                :active (complement :done)
                :done :done
-               :all identity)]
+               identity)]
     [:div
      [:section#main
       [:input#toggle-all {:type 'checkbox :checked (zero? active)
