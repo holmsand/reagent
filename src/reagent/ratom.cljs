@@ -32,28 +32,31 @@
                  (recur (inc i))
                  false))))))
 
-(defn- in-context [obj f]
-  (binding [*ratom-context* obj]
-    (f)))
+(declare ^:dynamic -captured)
 
-(defn- deref-capture [f r]
-  (set! (.-captured r) nil)
+(defn- in-context [obj f ^boolean update ^boolean check]
+  (binding [*ratom-context* obj
+            -captured nil]
+    (let [res (if check
+                (._try-exec obj f)
+                (f))]
+      (if update
+        (let [c -captured]
+          (set! *ratom-context* nil)
+          (set! -captured nil)
+          (._handle-result obj res c))
+        [res -captured]))))
+
+(defn- deref-capture [f r ^boolean check]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! generation (inc generation))))
-  (let [res (in-context r f)
-        c (.-captured r)]
-    (set! (.-dirty? r) false)
-    ;; Optimize common case where derefs occur in same order
-    (when-not (arr-eq c (.-watching r))
-      (._update-watching r c))
-    res))
+  (in-context r f true check))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
-    (let [c (.-captured r)]
-      (if (nil? c)
-        (set! (.-captured r) (array derefed))
-        (.push c derefed)))))
+    (if (nil? -captured)
+      (set! -captured (array derefed))
+      (.push -captured derefed))))
 
 (defn- add-w [this key f]
   (set! (.-watches this) (assoc (.-watches this) key f)))
@@ -426,14 +429,14 @@
       (doseq [w (s/difference old new)]
         (-remove-reaction w this))))
 
-  (_try-capture [this f]
+  (_try-exec [this f]
     (try
       (set! caught nil)
-      (deref-capture f this)
+      (f)
       (catch :default e
         (set! state e)
         (set! caught e)
-        (set! dirty? false))))
+        (set! dirty? true))))
 
   (_maybe-notify [this oldstate newstate]
     (let [has-w (some? watches)
@@ -445,15 +448,19 @@
         (when has-r
           (notify-r this)))))
 
-  (_run [this ^boolean check]
-    (let [oldstate state
-          res (if check
-                (._try-capture this f)
-                (deref-capture f this))]
+  (_handle-result [this res derefed]
+    (when-not (arr-eq derefed watching)
+      ;; Optimize common case where derefs occur in same order
+      (._update-watching this derefed))
+    (let [oldstate state]
       (when-not nocache?
         (set! state res)
-        (._maybe-notify this oldstate state))
-      res))
+        (._maybe-notify this oldstate res)))
+    res)
+
+  (_run [this ^boolean check]
+    (set! dirty? false)
+    (deref-capture f this check))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)
@@ -534,7 +541,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture f r)]
+        res (deref-capture f r false)]
     (when-not (nil? (.-watching r))
       (set! temp-reaction (make-reaction nil))
       (._set-opts r opts)
@@ -544,9 +551,8 @@
     res))
 
 (defn check-derefs [f]
-  (let [ctx (js-obj)
-        res (in-context ctx f)]
-    [res (some? (.-captured ctx))]))
+  (let [[res captured] (in-context #js{} f false false)]
+    [res (some? captured)]))
 
 
 ;;; wrap
