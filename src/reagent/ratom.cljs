@@ -128,7 +128,7 @@
     (.push ratom-queue a)
     (.push ratom-queue old)))
 
-(defn- flush-ratoms []
+(defn flush! []
   (let [q ratom-queue]
     (when-not (nil? q)
       (set! ratom-queue nil)
@@ -142,24 +142,6 @@
               (when-not (= old new)
                 (notify-r a old new)))
             (recur (+ 2 i))))))))
-
-(defonce ^:private rea-queue nil)
-
-(defn- rea-enqueue [r]
-  (when (nil? rea-queue)
-    (set! rea-queue (array))
-    (batch/schedule))
-  (.push rea-queue r))
-
-(defn flush! []
-  (flush-ratoms)
-  (loop []
-    (let [q rea-queue]
-      (when-not (nil? q)
-        (set! rea-queue nil)
-        (dotimes [i (alength q)]
-          (._queued-run (aget q i)))
-        (recur)))))
 
 (set! batch/ratom-flush flush!)
 
@@ -392,10 +374,6 @@
 (defprotocol IReaction
   (add-on-dispose! [this f]))
 
-(defn- handle-reaction-change [this sender old new]
-  (._handle-change this sender old new))
-
-
 (deftype Reaction [f ^:mutable state ^:mutable ^boolean dirty? ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
                    ^:mutable caught]
@@ -462,10 +440,6 @@
         (-add-reaction w this))
       (doseq [w (s/difference old new)]
         (-remove-reaction w this))))
-
-  (_queued-run [this]
-    (when (and dirty? (some? watching))
-      (._run this true)))
 
   (_try-capture [this f]
     (try
