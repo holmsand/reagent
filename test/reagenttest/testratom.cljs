@@ -471,16 +471,15 @@
                  (+ (val a)
                     (if (< (val a) 5)
                       (val b)
-                      (try (dbg (val b))
-                           (catch :default e
-                             (dbg "hej")
-                             10))))
+                      (dbg (try (dbg (val b))
+                                (catch :default e
+                                  (dbg "hej")
+                                  (dbg (val a))
+                                  10)))))
                  (val a)))
         _ (swap! tracks assoc :c (r/track plus :a :b))
         t (r/track! (fn []
-                      (val :c)
-                      ;; @(:c @tracks)
-                      ))]
+                      (val :c)))]
     (is (= @t 3))
     (swap! tracks assoc :b (r/track plus :a :b))
     (is (thrown-with-msg? :default #"Recursion limit in Reactio"

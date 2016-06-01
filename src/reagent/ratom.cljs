@@ -36,7 +36,7 @@
 
 (defn- check-depth [r]
   (when-some [d (.-rundepth r)]
-    (when (> d 10)
+    (when (> d 1)
       (dbg d)
       (throw (js/Error. "Recursion limit in Reaction exceeded")))))
 
@@ -46,7 +46,7 @@
     (let [res (if check
                 (._try-exec obj f)
                 (do
-                  (check-depth obj)
+                  ;; (check-depth obj)
                   (f)))]
       (if update
         (let [c -captured]
@@ -444,7 +444,7 @@
   (_try-exec [this f]
     (try
       (set! caught nil)
-      (check-depth this)
+      #_(check-depth this)
       (f)
       (catch :default e
         (set! state e)
@@ -494,6 +494,7 @@
   (-deref [this]
     (when-some [e caught]
       (throw e))
+    (check-depth this)
     (let [non-reactive (nil? *ratom-context*)]
       (when non-reactive
         (flush!))
