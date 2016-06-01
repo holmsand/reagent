@@ -102,8 +102,11 @@
         a (if (nil? w)
             ;; Copy watches to array for speed
             (set! (.-reactionsArr this) (into-array (.-reactions this)))
-            w)]
-    (dotimes [i (alength a)]
+            w)
+        len (alength a)]
+    (dotimes [i len]
+      (set! (.-dirty? (aget a i)) true))
+    (dotimes [i len]
       (._handle-change (aget a i)))))
 
 (defn- pr-atom [a writer opts s]
@@ -443,12 +446,13 @@
       (-deref this)))
 
   (_handle-change [this]
-    (if (nil? auto-run)
-      (do (set! dirty? true)
-          (._queued-run this))
-      (if (true? auto-run)
-        (._run this false)
-        (auto-run this))))
+    (when dirty?
+      (if (nil? auto-run)
+        (when-not (nil? watching)
+          (._run this true))
+        (if (true? auto-run)
+          (._run this false)
+          (auto-run this)))))
 
   (_update-watching [this derefed]
     (let [new (set derefed)
