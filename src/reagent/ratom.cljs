@@ -55,36 +55,20 @@
         (set! (.-captured r) (array derefed))
         (.push c derefed)))))
 
+(defn- add-w [this key f]
+  (set! (.-watches this) (assoc (.-watches this) key f)))
+
+(defn- remove-w [this key]
+  (set! (.-watches this) (dissoc (.-watches this) key)))
+
+(defn- notify-w [this old new]
+  (doseq [[key f] (.-watches this)]
+    (f key this old new)))
+
 (defn- check-watches [old new]
   (when debug
     (swap! -running + (- (count new) (count old))))
   new)
-
-(defn- add-w [this key f]
-  (let [w (.-watches this)]
-    (set! (.-watches this) (check-watches w (assoc w key f)))
-    (set! (.-watchesArr this) nil)))
-
-(defn- remove-w [this key]
-  (let [w (.-watches this)]
-    (set! (.-watches this) (check-watches w (dissoc w key)))
-    (set! (.-watchesArr this) nil)))
-
-(defn- notify-w [this old new]
-  (let [w (.-watchesArr this)
-        a (if (nil? w)
-            ;; Copy watches to array for speed
-            (->> (.-watches this)
-                 (reduce-kv #(doto %1 (.push %2) (.push %3)) #js[])
-                 (set! (.-watchesArr this)))
-            w)]
-    (let [len (alength a)]
-      (loop [i 0]
-        (when (< i len)
-          (let [k (aget a i)
-                f (aget a (inc i))]
-            (f k this old new))
-          (recur (+ 2 i)))))))
 
 (defn- add-r [this r]
   (let [w (.-reactions this)
@@ -97,7 +81,7 @@
     (set! (.-reactions this) (check-watches w (disj w r)))
     (set! (.-reactionsArr this) nil)))
 
-(defn- notify-r [this old new]
+(defn- notify-r [this]
   (let [w (.-reactionsArr this)
         a (if (nil? w)
             ;; Copy watches to array for speed
@@ -120,7 +104,7 @@
 (defonce ^:private ratom-queue nil)
 
 (defn- ratom-enqueue [a old]
-  (when-not (.-queued a)
+  (when-not (true? (.-queued a))
     (when (nil? ratom-queue)
       (set! ratom-queue (array))
       (batch/schedule))
@@ -139,8 +123,8 @@
                   old (aget q (inc i))
                   new (.-state a)]
               (set! (.-queued a) false)
-              (when-not (= old new)
-                (notify-r a old new)))
+              (when (not= old new)
+                (notify-r a)))
             (recur (+ 2 i))))))))
 
 (set! batch/ratom-flush flush!)
@@ -407,9 +391,8 @@
     (assert (fn? (.-on-set a)) "Reaction is read only.")
     (let [oldval state]
       (set! state newval)
+      (set! dirty? true)
       (.on-set a oldval newval)
-      (notify-w a oldval newval)
-      (notify-r a oldval newval)
       newval))
 
   ISwap
@@ -450,21 +433,24 @@
         (set! caught e)
         (set! dirty? false))))
 
-  (_run [this check]
+  (_maybe-notify [this oldstate newstate]
+    (let [has-w (some? watches)
+          has-r (some? (.-reactions this))]
+      (when (and (or has-w has-r)
+                 (not= oldstate newstate))
+        (when has-w
+          (notify-w this oldstate newstate))
+        (when has-r
+          (notify-r this)))))
+
+  (_run [this ^boolean check]
     (let [oldstate state
           res (if check
                 (._try-capture this f)
                 (deref-capture f this))]
       (when-not nocache?
         (set! state res)
-        ;; Use = to determine equality from reactions, since
-        ;; they are likely to produce new data structures.
-        (when-not (or (and (nil? watches)
-                           (nil? (.-reactions this)))
-                      (= oldstate res))
-          (when-not (nil? watches)
-            (notify-w this oldstate res))
-          (notify-r this oldstate res)))
+        (._maybe-notify this oldstate state))
       res))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -493,11 +479,7 @@
         (when dirty?
           (let [oldstate state]
             (set! state (f))
-            (when-not (or (and (nil? watches)
-                               (nil? (.-reactions this)))
-                          (= oldstate state))
-              (notify-w this oldstate state)
-              (notify-r this oldstate state))))
+            (._maybe-notify this oldstate state)))
         (do
           (notify-deref-watcher! this)
           (when dirty?
