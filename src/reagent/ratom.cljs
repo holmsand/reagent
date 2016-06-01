@@ -34,12 +34,20 @@
 
 (declare ^:dynamic -captured)
 
+(defn- check-depth [r]
+  (when-some [d (.-rundepth r)]
+    (when (> d 10)
+      (dbg d)
+      (throw (js/Error. "Recursion limit in Reaction exceeded")))))
+
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured nil]
     (let [res (if check
                 (._try-exec obj f)
-                (f))]
+                (do
+                  (check-depth obj)
+                  (f)))]
       (if update
         (let [c -captured]
           (set! *ratom-context* nil)
@@ -50,7 +58,11 @@
 (defn- deref-capture [f r ^boolean check]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! generation (inc generation))))
-  (in-context r f true check))
+  (try
+    (set! (.-rundepth r) (inc (if-some [d (.-rundepth r)] d 0)))
+    (in-context r f true check)
+    (finally
+      (set! (.-rundepth r) (dec (.-rundepth r))))))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
@@ -432,6 +444,7 @@
   (_try-exec [this f]
     (try
       (set! caught nil)
+      (check-depth this)
       (f)
       (catch :default e
         (set! state e)

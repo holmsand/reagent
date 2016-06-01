@@ -459,3 +459,47 @@
     (r/flush)
     (dispose r1)
     (is (= runs (running)))))
+
+(deftest recursion-fail
+  (let [runs (running)
+        state (r/atom 1)
+        tracks (r/atom {:a state
+                        :b (r/atom 2)})
+        val (fn [a] @(get @tracks a))
+        plus (fn [a b]
+               (if (> (val a) 0)
+                 (+ (val a)
+                    (if (< (val a) 5)
+                      (val b)
+                      (try (dbg (val b))
+                           (catch :default e
+                             (dbg "hej")
+                             10))))
+                 (val a)))
+        _ (swap! tracks assoc :c (r/track plus :a :b))
+        t (r/track! (fn []
+                      (val :c)
+                      ;; @(:c @tracks)
+                      ))]
+    (is (= @t 3))
+    (swap! tracks assoc :b (r/track plus :a :b))
+    (is (thrown-with-msg? :default #"Recursion limit in Reactio"
+                          (r/flush)))
+    (reset! state -1)
+    (is (nil? (r/flush)))
+    (is (= @t -1))
+    (reset! state 4)
+    (dbg state)
+    (is (thrown-with-msg? :default #"Recursion limit in Reaction"
+                          (r/flush)))
+    (reset! state 10)
+    (dbg state)
+    (is (thrown-with-msg? :default #"Recursion limit in Reaction exceeded"
+                          (r/flush)))
+    (dbg t)
+    (reset! state 11)
+    (dbg state)
+    (dbg (r/flush))
+    (is (= @t 21))
+    (dispose t)
+    (is (= runs (running)))))
