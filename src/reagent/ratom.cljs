@@ -368,10 +368,12 @@
   (-add-reaction [this r]
     (add-r this r))
   (-remove-reaction [this r]
-    (let [was-empty (empty? (.-reactions this))]
+    (let [was-empty (and (empty? (.-reactions this))
+                         (empty? watches))]
       (remove-r this r)
       (when (and (not was-empty)
                  (empty? (.-reactions this))
+                 (empty? watches)
                  (nil? auto-run))
         (dispose! this))))
 
