@@ -161,18 +161,18 @@
           (reset! @grand-state {:foobar 2})
           (r/flush)
           (is (found-in #"value:2:" div))
-          (is (= @ran 5))
+          (is (= @ran 4))
 
           (reset! state {:foo {:bar {:foobar 4}}})
           (reset! @grand-state {:foobar 4})
           (r/flush)
           (is (found-in #"value:4:" div))
-          (is (= @ran 6))
+          (is (= @ran 5))
 
           (reset! @grand-state {:foobar 4})
           (r/flush)
           (is (found-in #"value:4:" div))
-          (is (= @ran 7)))))))
+          (is (= @ran 5)))))))
 
 (deftest test-cursor
  (let [state (r/atom {:a {:v 1}

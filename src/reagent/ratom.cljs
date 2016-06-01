@@ -114,6 +114,32 @@
 
 ;;; Queueing
 
+(defonce ^:private ratom-queue nil)
+
+(defn- ratom-enqueue [a old]
+  (when-not (.-queued a)
+    (when (nil? ratom-queue)
+      (set! ratom-queue (array))
+      (batch/schedule))
+    (set! (.-queued a) true)
+    (.push ratom-queue a)
+    (.push ratom-queue old)))
+
+(defn- flush-ratoms []
+  (let [q ratom-queue]
+    (when-not (nil? q)
+      (set! ratom-queue nil)
+      (let [len (alength q)]
+        (loop [i 0]
+          (when (< i len)
+            (let [a (aget q i)
+                  old (aget q (inc i))
+                  new (.-state a)]
+              (set! (.-queued a) false)
+              (when-not (= old new)
+                (notify-r a old new)))
+            (recur (+ 2 i))))))))
+
 (defonce ^:private rea-queue nil)
 
 (defn- rea-enqueue [r]
@@ -123,6 +149,7 @@
   (.push rea-queue r))
 
 (defn flush! []
+  (flush-ratoms)
   (loop []
     (let [q rea-queue]
       (when-not (nil? q)
@@ -160,10 +187,9 @@
       (assert (validator new-value) "Validator rejected reference state"))
     (let [old-value state]
       (set! state new-value)
+      (ratom-enqueue a old-value)
       (when-not (nil? watches)
         (notify-w a old-value new-value))
-      (when-not (nil? (.-reactions a))
-        (notify-r a old-value new-value))
       new-value))
 
   ISwap
