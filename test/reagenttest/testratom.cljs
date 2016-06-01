@@ -475,7 +475,7 @@
                                 (catch :default e
                                   (dbg "hej")
                                   (dbg (val a))
-                                  10)))))
+                                  (val a))))))
                  (val a)))
         _ (swap! tracks assoc :c (r/track plus :a :b))
         t (r/track! (fn []
@@ -491,7 +491,7 @@
     (dbg state)
     (is (thrown-with-msg? :default #"Recursion limit in Reaction"
                           (r/flush)))
-    (reset! state 10)
+    (reset! state 12)
     (dbg state)
     (is (thrown-with-msg? :default #"Recursion limit in Reaction exceeded"
                           (r/flush)))
