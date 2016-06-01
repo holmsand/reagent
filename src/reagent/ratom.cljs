@@ -86,6 +86,26 @@
             (f k this old new))
           (recur (+ 2 i)))))))
 
+(defn- add-r [this r]
+  (let [w (.-reactions this)
+        w' (if (nil? w) #{r} (conj w r))]
+    (set! (.-reactions this) (check-watches w w'))
+    (set! (.-reactionsArr this) nil)))
+
+(defn- remove-r [this r]
+  (let [w (.-reactions this)]
+    (set! (.-reactions this) (check-watches w (disj w r)))
+    (set! (.-reactionsArr this) nil)))
+
+(defn- notify-r [this old new]
+  (let [w (.-reactionsArr this)
+        a (if (nil? w)
+            ;; Copy watches to array for speed
+            (set! (.-reactionsArr this) (into-array (.-reactions this)))
+            w)]
+    (dotimes [i (alength a)]
+      (._handle-change (aget a i) this old new))))
+
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
   (pr-writer (binding [*ratom-context* nil] (-deref a)) writer opts)
@@ -118,6 +138,10 @@
 
 (defprotocol IReactiveAtom)
 
+(defprotocol IReactionWatchable
+  (-add-reaction [this r])
+  (-remove-reaction [this r]))
+
 (deftype RAtom [^:mutable state meta validator ^:mutable watches]
   IAtom
   IReactiveAtom
@@ -138,6 +162,8 @@
       (set! state new-value)
       (when-not (nil? watches)
         (notify-w a old-value new-value))
+      (when-not (nil? (.-reactions a))
+        (notify-r a old-value new-value))
       new-value))
 
   ISwap
@@ -151,6 +177,10 @@
 
   IPrintWithWriter
   (-pr-writer [a w opts] (pr-atom a w opts "Atom:"))
+
+  IReactionWatchable
+  (-add-reaction [this r]         (add-r this r))
+  (-remove-reaction [this r]      (remove-r this r))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
@@ -343,6 +373,17 @@
   IAtom
   IReactiveAtom
 
+  IReactionWatchable
+  (-add-reaction [this r]
+    (add-r this r))
+  (-remove-reaction [this r]
+    (let [was-empty (empty? (.-reactions this))]
+      (remove-r this r)
+      (when (and (not was-empty)
+                 (empty? (.-reactions this))
+                 (nil? auto-run))
+        (dispose! this))))
+
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
   (-add-watch [this key f]        (add-w this key f))
@@ -361,6 +402,7 @@
       (set! state newval)
       (.on-set a oldval newval)
       (notify-w a oldval newval)
+      (notify-r a oldval newval)
       newval))
 
   ISwap
@@ -390,9 +432,11 @@
           old (set watching)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
-        (-add-watch w this handle-reaction-change))
+        (-add-reaction w this)
+        #_(-add-watch w this handle-reaction-change))
       (doseq [w (s/difference old new)]
-        (-remove-watch w this))))
+        (-remove-reaction w this)
+        #_(-remove-watch w this))))
 
   (_queued-run [this]
     (when (and dirty? (some? watching))
@@ -416,9 +460,12 @@
         (set! state res)
         ;; Use = to determine equality from reactions, since
         ;; they are likely to produce new data structures.
-        (when-not (or (nil? watches)
+        (when-not (or (and (nil? watches)
+                           (nil? (.-reactions this)))
                       (= oldstate res))
-          (notify-w this oldstate res)))
+          (when-not (nil? watches)
+            (notify-w this oldstate res))
+          (notify-r this oldstate res)))
       res))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -447,8 +494,11 @@
         (when dirty?
           (let [oldstate state]
             (set! state (f))
-            (when-not (or (nil? watches) (= oldstate state))
-              (notify-w this oldstate state))))
+            (when-not (or (and (nil? watches)
+                               (nil? (.-reactions this)))
+                          (= oldstate state))
+              (notify-w this oldstate state)
+              (notify-r this oldstate state))))
         (do
           (notify-deref-watcher! this)
           (when dirty?
@@ -471,7 +521,7 @@
       (set! auto-run nil)
       (set! dirty? true)
       (doseq [w (set wg)]
-        (-remove-watch w this))
+        (-remove-reaction w this))
       (when (some? (.-on-dispose this))
         (.on-dispose this s))
       (when-some [a (.-on-dispose-arr this)]
