@@ -104,7 +104,7 @@
             (set! (.-reactionsArr this) (into-array (.-reactions this)))
             w)]
     (dotimes [i (alength a)]
-      (._handle-change (aget a i) this old new))))
+      (._handle-change (aget a i)))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -442,27 +442,22 @@
     (binding [*ratom-context* nil]
       (-deref this)))
 
-  (_handle-change [this sender oldval newval]
-    (when-not (or (identical? oldval newval)
-                  dirty?)
-      (if (nil? auto-run)
-        (do
-          (set! dirty? true)
-          (rea-enqueue this))
-        (if (true? auto-run)
-          (._run this false)
-          (auto-run this)))))
+  (_handle-change [this]
+    (if (nil? auto-run)
+      (do (set! dirty? true)
+          (._queued-run this))
+      (if (true? auto-run)
+        (._run this false)
+        (auto-run this))))
 
   (_update-watching [this derefed]
     (let [new (set derefed)
           old (set watching)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
-        (-add-reaction w this)
-        #_(-add-watch w this handle-reaction-change))
+        (-add-reaction w this))
       (doseq [w (s/difference old new)]
-        (-remove-reaction w this)
-        #_(-remove-watch w this))))
+        (-remove-reaction w this))))
 
   (_queued-run [this]
     (when (and dirty? (some? watching))
