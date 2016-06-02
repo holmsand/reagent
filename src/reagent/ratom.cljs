@@ -40,7 +40,7 @@
     (when (> d limit)
       (set! (.-rundepth r) 0)
       (throw (js/Error. (str "Recursion limit in Reaction exceeded "
-                             (.-f r)))))))
+                             limit " " (.-f r)))))))
 
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
@@ -122,6 +122,7 @@
 
 (defn- ratom-enqueue [a old]
   (set! generation (inc generation))
+  (set! (.-age a) generation)
   (when-not (true? (.-queued a))
     (when (nil? ratom-queue)
       (set! ratom-queue (array))
@@ -174,7 +175,8 @@
       (assert (validator new-value) "Validator rejected reference state"))
     (let [old-value state]
       (set! state new-value)
-      (ratom-enqueue a old-value)
+      (when-not (identical? old-value new-value)
+        (ratom-enqueue a old-value))
       (when-not (nil? watches)
         (notify-w a old-value new-value))
       new-value))
@@ -412,7 +414,7 @@
     (let [oldval state]
       (set! state newval)
       #_(set! dirty? true)
-      (set! age (dec age))
+      ;; (set! age (dec age))
       (.on-set a oldval newval)
       newval))
 
@@ -430,8 +432,30 @@
   (_dirty? [this]
     (not= age generation))
 
+  (_check-dirty? [this exec]
+    #_(._dirty? this)
+    (cond
+      (not (._dirty? this)) false
+      (nil? watching) true
+      :else
+      (let [dirty (some
+                   (fn [r]
+                     (if (some? (.-_check-dirty? r))
+                       (._check-dirty? r true)
+                       (< age (.-age r))))
+                   watching)]
+        (if dirty
+          (if exec
+            (let [os state]
+              (do (._run this true)
+                  ;; (assert (not (._dirty? this)))
+                  (not= state os)))
+            true)
+          (do (set! age generation)
+              false)))))
+
   (_handle-change [this]
-    (when (._dirty? this)
+    (when true; (._dirty? this)
       (if (nil? auto-run)
         (when-not (nil? watching)
           (._run this true))
@@ -457,7 +481,7 @@
       (catch :default e
         (set! state e)
         (set! caught e)
-        (set! age (dec age))
+        (set! age 0)
         #_(set! dirty? true))))
 
   (_maybe-notify [this oldstate newstate]
@@ -471,18 +495,20 @@
           (notify-r this)))))
 
   (_handle-result [this res derefed]
-    (when-not (arr-eq derefed watching)
+    (if-not (arr-eq derefed watching)
       ;; Optimize common case where derefs occur in same order
-      (._update-watching this derefed))
+      (._update-watching this derefed)
+      (if (nil? watching)
+        (set! watching #js[])))
     (let [oldstate state]
+      (set! age generation)
       (when-not nocache?
         (set! state res)
-        (set! age generation)
         (._maybe-notify this oldstate res)))
     res)
 
   (_run [this ^boolean check]
-    (assert (nil? caught))
+    ;; (assert (nil? caught))
     ;; (set! dirty? false)
     (deref-capture f this check))
 
@@ -498,7 +524,7 @@
 
   IRunnable
   (run [this]
-    (flush!)
+    ;; (flush!)
     (._run this false))
 
   IDeref
@@ -506,18 +532,19 @@
     (check-depth this 5)
     (when-some [e caught]
       (set! caught nil)
+      (set! age (dec age))
       (throw e))
     (let [non-reactive (nil? *ratom-context*)]
-      (when non-reactive
-        (flush!))
+      ;; (when non-reactive
+      ;;   (flush!))
       (if (and non-reactive (nil? auto-run))
-        (when (._dirty? this)
+        (when (._check-dirty? this false)
           (let [oldstate state]
             (set! state (f))
             (._maybe-notify this oldstate state)))
         (do
           (notify-deref-watcher! this)
-          (when (._dirty? this)
+          (when (._check-dirty? this false)
             (._run this false)))))
     state)
 
@@ -536,7 +563,7 @@
       (set! state nil)
       (set! auto-run nil)
       ;; (set! dirty? true)
-      (set! age (dec age))
+      ;; (set! age (dec age))
       (doseq [w (set wg)]
         (-remove-reaction w this))
       (when (some? (.-on-dispose this))
@@ -556,7 +583,7 @@
 
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
-  (let [reaction (Reaction. f nil true false nil nil nil nil 0)]
+  (let [reaction (Reaction. f nil true false nil nil nil nil -1)]
     (._set-opts reaction {:auto-run auto-run
                           :on-set on-set
                           :on-dispose on-dispose})

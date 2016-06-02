@@ -21,8 +21,8 @@
                      :color :#aaa})
 
 (defn all-tests []
-  (test/run-tests 'reagenttest.testratom)
-  #_(test/run-all-tests #"reagenttest.test.*"))
+  #_(test/run-tests 'reagenttest.testratom)
+  (test/run-all-tests #"reagenttest.test.*"))
 
 (defmethod test/report [::test/default :summary] [m]
   ;; ClojureScript 2814 doesn't return anything from run-tests

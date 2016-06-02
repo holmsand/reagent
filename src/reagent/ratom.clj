@@ -43,10 +43,12 @@
     `(let [~v (reagent.ratom/with-let-values ~k)]
        (when ~asserting
          (when-some [c# reagent.ratom/*ratom-context*]
-           (when (== (.-generation ~v) (.-ratomGeneration c#))
-             (d/error "Warning: The same with-let is being used more "
-                      "than once in the same reactive context."))
-           (set! (.-generation ~v) (.-ratomGeneration c#))))
+           (when (== (.-let-generation ~v) (.-ratomGeneration c#))
+             (d/error (str "Warning: The same with-let is being used more "
+                           "than once in the same reactive context. "
+                           (.-let-generation ~v) ", " (.-ratomGeneration c#))
+                      ))
+           (set! (.-let-generation ~v) (.-ratomGeneration c#))))
        (let ~bs
          (let [res# (do ~@forms)]
            ~add-destroy

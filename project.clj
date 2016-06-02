@@ -29,7 +29,7 @@
                     :cljsbuild
                     {:builds
                      {:client
-                      {:figwheel {:reload-dependents false} ;;true
+                      {:figwheel {:reload-dependents false} #_true
                        :compiler {:source-map true
                                   :optimizations :none
                                   :recompile-dependents false

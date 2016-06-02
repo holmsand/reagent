@@ -133,17 +133,17 @@
       (is (= @c-changed 0))
              
       (reset! a 2)
-      (is (= @res (+ 10 @a)))
+      (is (= @res (+ 10 @a)) "1" )
       (is (<= 2 @b-changed 3))
       (is (= @c-changed 1))
              
       (reset! a 3)
-      (is (= @res (+ 10 @a)))
+      (is (= @res (+ 10 @a)) "2")
       (is (<= 2 @b-changed 3))
       (is (= @c-changed 2))
              
       (reset! a 3)
-      (is (= @res (+ 10 @a)))
+      (is (= @res (+ 10 @a)) "3")
       (is (<= 2 @b-changed 3))
       (is (= @c-changed 2))
              
@@ -458,6 +458,23 @@
     (swap! state assoc :val 2)
     (r/flush)
     (dispose r1)
+    (is (= runs (running)))))
+
+(deftest empty-function
+  (let [runs (running)
+        spy (atom 0)
+        foo (r/atom 0)
+        empty (reaction (dbg (swap! spy inc)) 1)
+        r (run! (dbg "running") (dbg @empty) @foo)]
+    (dbg (._dirty? empty))
+    (dbg (._check-dirty? empty))
+    (dbg (._check-dirty? empty))
+    (is (= @spy 1) "a")
+    (swap! foo inc)
+    (is (nil? (r/flush)))
+    (is (= @spy 1) "b")
+    (is (= @r @foo))
+    (dispose r)
     (is (= runs (running)))))
 
 #_(deftest recursion-fail

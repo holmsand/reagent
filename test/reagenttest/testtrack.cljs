@@ -15,7 +15,7 @@
 (defn running []
   (rv/running))
 
-(def testite 10)
+(def testite 1)
 
 (defn dispose [v]
   (rv/dispose! v))
