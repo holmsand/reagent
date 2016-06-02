@@ -469,11 +469,7 @@
         plus (fn [a b]
                (if (> (val a) 0)
                  (+ (val a)
-                    (if (< (val a) 5)
-                      (val b)
-                      (try (val b)
-                           (catch :default e
-                             (val a)))))
+                    (val b))
                  (val a)))
         _ (swap! tracks assoc :c (r/track plus :a :b))
         t (r/track! (fn []

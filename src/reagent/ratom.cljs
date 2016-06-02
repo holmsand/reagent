@@ -498,7 +498,6 @@
     (check-depth this 5)
     (when-some [e caught]
       (set! caught nil)
-      (set! dirty? true)
       (throw e))
     (let [non-reactive (nil? *ratom-context*)]
       (when non-reactive
