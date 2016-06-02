@@ -42,7 +42,7 @@
       (throw (js/Error. (str "Recursion limit in Reaction exceeded "
                              limit " " (.-f r)))))))
 
-(defn- in-context [obj f ^boolean update ^boolean check]
+(defn- in-context [obj f ^boolean update ^boolean check ^boolean notify]
   (binding [*ratom-context* obj
             -captured nil]
     (let [res
@@ -53,16 +53,16 @@
         (let [c -captured]
           (set! *ratom-context* nil)
           (set! -captured nil)
-          (._handle-result obj res c))
+          (._handle-result obj res c notify))
         [res -captured]))))
 
-(defn- deref-capture [f r ^boolean check]
+(defn- deref-capture [f r ^boolean check notify]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
   (let [dep (if-some [d (.-rundepth r)] d 0)]
     (set! (.-rundepth r) (inc dep))
     (try
-      (in-context r f true check)
+      (in-context r f true check notify)
       (finally
         (set! (.-rundepth r) dep)))))
 
@@ -376,7 +376,7 @@
 (defprotocol IReaction
   (add-on-dispose! [this f]))
 
-(deftype Reaction [f ^:mutable state ^:mutable ^boolean nocache?
+(deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
                    ^:mutable caught ^:mutable ^number age
                    ^:mutable ^number last-update]
@@ -443,7 +443,6 @@
       (if dirty
         (let [os state]
           (do (._exec this notify)
-              ;; TODO: Do = only once.
               (or (== age last-update)
                   (not= state os))))
         (do (set! age generation)
@@ -452,9 +451,9 @@
   (_handle-change [this]
     (if (nil? auto-run)
       (when-not (== age -1)
-        (._run this true))
+        (._run this true true))
       (if (true? auto-run)
-        (._run this false)
+        (._run this false true)
         (auto-run this))))
 
   (_update-watching [this derefed]
@@ -488,7 +487,7 @@
           (when has-r
             (notify-r this))))))
 
-  (_handle-result [this res derefed]
+  (_handle-result [this res derefed notify]
     (let [oldstate state]
       (set! age generation)
       (when-not nocache?)
@@ -496,12 +495,12 @@
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
-      (when-not nocache?
+      (when (and notify (not nocache?))
         (._maybe-notify this oldstate res)))
     res)
 
-  (_run [this ^boolean check]
-    (deref-capture f this check))
+  (_run [this ^boolean check notify]
+    (deref-capture f this check notify))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)
@@ -519,17 +518,11 @@
         (let [oldstate state]
           (set! state (f))
           (._maybe-notify this oldstate state))
-        (if notify
-          (._run this true)
-          (try
-            (set! nocache? true)
-            (._run this true)
-            (finally
-              (set! nocache? true)))))))
+        (._run this true notify))))
 
   IRunnable
   (run [this]
-    (._run this false))
+    (._run this false true))
 
   IDeref
   (-deref [this]
@@ -589,7 +582,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture f r false)]
+        res (deref-capture f r false true)]
     (when-not (nil? (.-watching r))
       (set! temp-reaction (make-reaction nil))
       (._set-opts r opts)
@@ -599,7 +592,7 @@
     res))
 
 (defn check-derefs [f]
-  (let [[res captured] (in-context #js{} f false false)]
+  (let [[res captured] (in-context #js{} f false false false)]
     [res (some? captured)]))
 
 
