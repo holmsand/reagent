@@ -43,7 +43,7 @@
     (is (= @count 1))
     (sync)
     (is (= @out 3))
-    (is (<= 3 @count 4))
+    (is (<= 2 @count 4))
     (reset! start 2)
     (dispose const)
     (is (= (running) runs) "did dispose")
@@ -67,13 +67,12 @@
     (is (= @c3-count 1))
     (sync)
     (is (= @c3-count 2) "t2")
-
-    (is (= @c3 2) "c32")
+    (is (= @c3 2))
     (is (= @c3-count 2) "t3")
     (dispose c3)
     (is (= (running) runs))
     (sync)
-    (is (= @c3 2) "recover")
+    (is (= @c3 2))
     (is (= (running) runs))))
 
 (deftest test-from-reflex
