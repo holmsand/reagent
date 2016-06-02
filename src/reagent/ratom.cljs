@@ -9,6 +9,7 @@
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
 (defonce ^:private generation 0)
+(defonce ^:private with-let-gen 0)
 (defonce ^:private -running (clojure.core/atom 0))
 
 (defn ^boolean reactive? []
@@ -50,7 +51,7 @@
 
 (defn- deref-capture [f r ^boolean check notify]
   (when (dev?)
-    (set! (.-ratomGeneration r) generation))
+    (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
   (in-context r f true check notify))
 
 (defn- notify-deref-watcher! [derefed]
