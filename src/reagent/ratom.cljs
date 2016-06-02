@@ -105,8 +105,6 @@
             (set! (.-reactionsArr this) (into-array (.-reactions this)))
             w)
         len (alength a)]
-    ;; (dotimes [i len]
-    ;;   (set! (.-dirty? (aget a i)) true))
     (dotimes [i len]
       (._handle-change (aget a i)))))
 
@@ -378,9 +376,9 @@
 (defprotocol IReaction
   (add-on-dispose! [this f]))
 
-(deftype Reaction [f ^:mutable state ^:mutable ^boolean dirty? ^boolean nocache?
+(deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
-                   ^:mutable caught ^:mutable age]
+                   ^:mutable caught ^:mutable ^number age]
   IAtom
   IReactiveAtom
 
@@ -413,8 +411,6 @@
     (assert (fn? (.-on-set a)) "Reaction is read only.")
     (let [oldval state]
       (set! state newval)
-      #_(set! dirty? true)
-      ;; (set! age (dec age))
       (.on-set a oldval newval)
       newval))
 
@@ -433,7 +429,6 @@
     (not= age generation))
 
   (_check-dirty? [this exec]
-    #_(._dirty? this)
     (let [dirty (cond
                   (nil? watching) true ;; TODO: Don't use as signal?'
                   (not (._dirty? this)) false
@@ -448,7 +443,6 @@
         (if exec
           (let [os state]
             (do (._exec this)
-                ;; (assert (not (._dirty? this)))
                 ;; TODO: Do this only once.
                 (not= state os)))
           true)
@@ -456,13 +450,12 @@
             false))))
 
   (_handle-change [this]
-    (when true; (._dirty? this)
-      (if (nil? auto-run)
-        (when-not (nil? watching)
-          (._run this true))
-        (if (true? auto-run)
-          (._run this false)
-          (auto-run this)))))
+    (if (nil? auto-run)
+      (when-not (nil? watching)
+        (._run this true))
+      (if (true? auto-run)
+        (._run this false)
+        (auto-run this))))
 
   (_update-watching [this derefed]
     (let [new (set derefed)
@@ -482,8 +475,7 @@
       (catch :default e
         (set! state e)
         (set! caught e)
-        (set! age 0)
-        #_(set! dirty? true))))
+        (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
     (let [has-w (some? watches)
@@ -510,8 +502,6 @@
     res)
 
   (_run [this ^boolean check]
-    ;; (assert (nil? caught))
-    ;; (set! dirty? false)
     (deref-capture f this check))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -534,7 +524,6 @@
 
   IRunnable
   (run [this]
-    ;; (flush!)
     (._run this false))
 
   IDeref
@@ -563,7 +552,6 @@
       (set! watching nil)
       (set! state nil)
       (set! auto-run nil)
-      ;; (set! dirty? true)
       (set! age -1)
       (doseq [w (set wg)]
         (-remove-reaction w this))
@@ -584,7 +572,7 @@
 
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
-  (let [reaction (Reaction. f nil true false nil nil nil nil -1)]
+  (let [reaction (Reaction. f nil false nil nil nil nil -1)]
     (._set-opts reaction {:auto-run auto-run
                           :on-set on-set
                           :on-dispose on-dispose})
