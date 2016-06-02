@@ -378,7 +378,8 @@
 
 (deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
-                   ^:mutable caught ^:mutable ^number age]
+                   ^:mutable caught ^:mutable ^number age
+                   ^:mutable ^number last-update]
   IAtom
   IReactiveAtom
 
@@ -444,7 +445,8 @@
           (let [os state]
             (do (._exec this)
                 ;; TODO: Do this only once.
-                (not= state os)))
+                (or (== age last-update)
+                    (not= state os))))
           true)
         (do (set! age generation)
             false))))
@@ -482,6 +484,7 @@
           has-r (some? (.-reactions this))]
       (when (and (or has-w has-r)
                  (not= oldstate newstate))
+        (set! last-update age)
         (when has-w
           (notify-w this oldstate newstate))
         (when has-r
@@ -572,7 +575,7 @@
 
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
-  (let [reaction (Reaction. f nil false nil nil nil nil -1)]
+  (let [reaction (Reaction. f nil false nil nil nil nil -1 0)]
     (._set-opts reaction {:auto-run auto-run
                           :on-set on-set
                           :on-dispose on-dispose})
