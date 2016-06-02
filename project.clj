@@ -29,10 +29,10 @@
                     :cljsbuild
                     {:builds
                      {:client
-                      {:figwheel true
+                      {:figwheel {:reload-dependents false} ;;true
                        :compiler {:source-map true
                                   :optimizations :none
-                                  ;; :recompile-dependents false
+                                  :recompile-dependents false
                                   :output-dir "outsite/public/js/out"
                                   :asset-path "js/out"}}}}}]
 

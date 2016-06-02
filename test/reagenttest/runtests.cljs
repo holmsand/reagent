@@ -1,4 +1,4 @@
-(ns reagenttest.runtests
+(ns ^:figwheel-always reagenttest.runtests
   (:require [reagenttest.testreagent]
             [reagenttest.testcursor]
             [reagenttest.testinterop]

@@ -1,4 +1,4 @@
-(ns reagentdemo.core
+(ns ^:figwheel-always reagentdemo.core
   (:require [reagent.core :as r]
             [clojure.string :as string]
             [sitetools.core :as tools :refer [emit link]]
