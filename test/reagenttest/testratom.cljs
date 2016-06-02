@@ -133,7 +133,7 @@
       (is (= @c-changed 0))
              
       (reset! a 2)
-      (is (= @res (+ 10 @a)) "1" )
+      (is (= @res (+ 10 @a)) "1")
       (is (<= 2 @b-changed 3))
       (is (= @c-changed 1))
              

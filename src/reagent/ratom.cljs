@@ -435,7 +435,7 @@
   (_check-dirty? [this exec]
     #_(._dirty? this)
     (let [dirty (cond
-                  (nil? watching) true
+                  (nil? watching) true ;; TODO: Don't use as signal?'
                   (not (._dirty? this)) false
                   :else
                   (some
