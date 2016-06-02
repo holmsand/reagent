@@ -18,6 +18,12 @@
 
 ;;; Utilities
 
+(defn- bool? [x]
+  (case x
+    true true
+    false true
+    false))
+
 (defn running []
   (+ @-running))
 
@@ -414,13 +420,11 @@
     (binding [*ratom-context* nil]
       (-deref this)))
 
-  (_dirty? [this]
-    (not (== age generation)))
-
   (_check-dirty? [this notify]
+    (assert (bool? notify))
     (let [dirty (cond
                   (== age -1) true
-                  (not (._dirty? this)) false
+                  (== age generation) false
                   :else
                   (some
                    (fn [r]
@@ -431,8 +435,9 @@
       (if dirty
         (let [os state]
           (do (._exec this notify)
-              (or (== age last-update)
-                  (not= state os))))
+              (if (== age last-update)
+                false
+                (not= state os))))
         (do (set! age generation)
             false))))
 
