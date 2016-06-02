@@ -44,11 +44,10 @@
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured nil]
-    (let [res (if check
-                (._try-exec obj f)
-                (do
-                  ;; (check-depth obj)
-                  (f)))]
+    (let [res
+          (if check
+            (._try-exec obj f)
+            (f))]
       (if update
         (let [c -captured]
           (set! *ratom-context* nil)
