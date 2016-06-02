@@ -35,13 +35,6 @@
 
 (declare ^:dynamic -captured)
 
-(defn- check-depth [r limit]
-  (when-some [d (.-rundepth r)]
-    (when (> d limit)
-      (set! (.-rundepth r) 0)
-      (throw (js/Error. (str "Recursion limit in Reaction exceeded "
-                             limit " " (.-f r)))))))
-
 (defn- in-context [obj f ^boolean update ^boolean check ^boolean notify]
   (binding [*ratom-context* obj
             -captured nil]
@@ -59,12 +52,7 @@
 (defn- deref-capture [f r ^boolean check notify]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
-  (let [dep (if-some [d (.-rundepth r)] d 0)]
-    (set! (.-rundepth r) (inc dep))
-    (try
-      (in-context r f true check notify)
-      (finally
-        (set! (.-rundepth r) dep)))))
+  (in-context r f true check notify))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
@@ -461,10 +449,8 @@
           old (set watching)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
-        (check-depth this 2)
         (-add-reaction w this))
       (doseq [w (s/difference old new)]
-        (check-depth this 2)
         (-remove-reaction w this))))
 
   (_try-exec [this f]
@@ -526,7 +512,6 @@
 
   IDeref
   (-deref [this]
-    (check-depth this 5)
     (when-some [e caught]
       (set! caught nil)
       (set! age (dec age))
