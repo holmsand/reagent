@@ -56,7 +56,7 @@
     (reset! start 1)
     (r/flush)
     (is (= @out 3))
-    (is (<= 2 @count 3))
+    (is (<= 3 @count 4))
     (dispose const)
     (is (= (running) runs))))
 
@@ -129,7 +129,7 @@
              
       (reset! a -1)
       (is (= @res (+ 2 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed 3))
       (is (= @c-changed 0))
              
       (reset! a 2)

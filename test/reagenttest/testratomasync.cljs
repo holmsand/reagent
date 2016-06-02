@@ -43,7 +43,7 @@
     (is (= @count 1))
     (sync)
     (is (= @out 3))
-    (is (<= 2 @count 3))
+    (is (<= 3 @count 4))
     (reset! start 2)
     (dispose const)
     (is (= (running) runs) "did dispose")
@@ -130,7 +130,7 @@
       (is (= @b-changed 1))
       (sync)
 
-      (is (= @b-changed 2))
+      (is (= @b-changed 3))
       (is (= @c-changed 0))
       (is (= @res (+ 2 @a)))
              
@@ -223,12 +223,12 @@
       (is (= @res 1))
       (is (= @disposed nil))
       (is (= @count-b 2))
-      (is (= @count-c 2))
+      (is (= @count-c 3))
       (reset! a 2)
       (is (= @res 1) "unchanged")
       (sync)
       (is (= @res 102) "new value")
-      (is (= @count-c 3))
+      (is (= @count-c 5))
       (is (= @disposed true) "should be disposed")
 
       (reset! disposed nil)

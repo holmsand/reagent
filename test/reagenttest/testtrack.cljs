@@ -47,7 +47,7 @@
     (reset! start 1)
     (r/flush)
     (is (= @out 8))
-    (is (<= 2 @count 3))
+    (is (<= 3 @count 4))
     (dispose const)
     (is (= (running) runs))))
 
@@ -74,13 +74,13 @@
     (is (= @count 1))
     (sync)
     (is (= @out 8))
-    (is (<= 2 @count 3))
+    (is (<= 3 @count 4))
     (dispose const)
     (swap! start inc)
     (sync)
-    (is (<= 2 @count 3))
+    (is (<= 4 @count 5))
     (is (= @const 11))
-    (is (<= 3 @count 4))
+    (is (<= 4 @count 5))
     (is (= (running) runs))))
 
 (deftest double-dependency
@@ -139,7 +139,7 @@
 
       (reset! a -1)
       (is (= @res (+ 2 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed 3))
       (is (= @c-changed 0))
 
       (reset! a 2)

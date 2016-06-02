@@ -435,8 +435,8 @@
   (_check-dirty? [this exec]
     #_(._dirty? this)
     (let [dirty (cond
-                  (not (._dirty? this)) false
                   (nil? watching) true
+                  (not (._dirty? this)) false
                   :else
                   (some
                    (fn [r]
@@ -447,8 +447,9 @@
       (if dirty
         (if exec
           (let [os state]
-            (do (._run this true)
+            (do (._exec this)
                 ;; (assert (not (._dirty? this)))
+                ;; TODO: Do this only once.
                 (not= state os)))
           true)
         (do (set! age generation)
@@ -523,6 +524,14 @@
     (when (some? no-cache)
       (set! (.-nocache? this) no-cache)))
 
+  (_exec [this]
+    (let [non-reactive (nil? *ratom-context*)]
+      (if (and non-reactive (nil? auto-run))
+        (let [oldstate state]
+          (set! state (f))
+          (._maybe-notify this oldstate state))
+        (._run this true))))
+
   IRunnable
   (run [this]
     ;; (flush!)
@@ -535,19 +544,9 @@
       (set! caught nil)
       (set! age (dec age))
       (throw e))
-    (let [non-reactive (nil? *ratom-context*)]
-      ;; (when non-reactive
-      ;;   (flush!))
-      (if (and non-reactive (nil? auto-run))
-        (when (._check-dirty? this false)
-          (let [oldstate state]
-            (set! state (f))
-            (._maybe-notify this oldstate state)))
-        (do
-          (notify-deref-watcher! this)
-          (._check-dirty? this true)
-          #_(when (._check-dirty? this false)
-            (._run this false)))))
+    (when-not (nil? *ratom-context*)
+      (notify-deref-watcher! this))
+    (._check-dirty? this true)
     state)
 
   IReaction
