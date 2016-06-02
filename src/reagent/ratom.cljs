@@ -59,8 +59,8 @@
   (when (dev?)
     (set! (.-ratomGeneration r) (set! generation (inc generation))))
   (let [dep (if-some [d (.-rundepth r)] d 0)]
+    (set! (.-rundepth r) (inc dep))
     (try
-      (set! (.-rundepth r) (inc dep))
       (in-context r f true check)
       (finally
         (set! (.-rundepth r) dep)))))
@@ -140,7 +140,6 @@
                   new (.-state a)]
               (set! (.-queued a) false)
               (when (not= old new)
-                (set! generation (inc generation))
                 (notify-r a)))
             (recur (+ 2 i))))))))
 
