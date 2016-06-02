@@ -427,11 +427,11 @@
       (-deref this)))
 
   (_dirty? [this]
-    (not= age generation))
+    (not (== age generation)))
 
   (_check-dirty? [this exec]
     (let [dirty (cond
-                  (nil? watching) true ;; TODO: Don't use as signal?'
+                  (== age -1) true
                   (not (._dirty? this)) false
                   :else
                   (some
@@ -444,7 +444,7 @@
         (if exec
           (let [os state]
             (do (._exec this)
-                ;; TODO: Do this only once.
+                ;; TODO: Do = only once.
                 (or (== age last-update)
                     (not= state os))))
           true)
@@ -453,7 +453,7 @@
 
   (_handle-change [this]
     (if (nil? auto-run)
-      (when-not (nil? watching)
+      (when-not (== age -1)
         (._run this true))
       (if (true? auto-run)
         (._run this false)
@@ -482,13 +482,13 @@
   (_maybe-notify [this oldstate newstate]
     (let [has-w (some? watches)
           has-r (some? (.-reactions this))]
-      (when (and (or has-w has-r)
-                 (not= oldstate newstate))
+      (when (or has-w has-r)
         (set! last-update age)
-        (when has-w
-          (notify-w this oldstate newstate))
-        (when has-r
-          (notify-r this)))))
+        (when (not= oldstate newstate)
+          (when has-w
+            (notify-w this oldstate newstate))
+          (when has-r
+            (notify-r this))))))
 
   (_handle-result [this res derefed]
     (let [oldstate state]
@@ -497,9 +497,7 @@
       (set! state res)
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
-        (._update-watching this derefed)
-        (if (nil? watching)
-          (set! watching #js[])))
+        (._update-watching this derefed))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
