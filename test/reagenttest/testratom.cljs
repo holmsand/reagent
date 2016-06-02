@@ -15,7 +15,7 @@
 (defn running []
   (rv/running))
 
-(def testite 10)
+(def testite 1)
 
 (defn dispose [v]
   (rv/dispose! v))
@@ -460,7 +460,7 @@
     (dispose r1)
     (is (= runs (running)))))
 
-(deftest recursion-fail
+#_(deftest recursion-fail
   (let [runs (running)
         state (r/atom 1)
         tracks (r/atom {:a state
