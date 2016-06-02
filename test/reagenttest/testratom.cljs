@@ -464,11 +464,8 @@
   (let [runs (running)
         spy (atom 0)
         foo (r/atom 0)
-        empty (reaction (dbg (swap! spy inc)) 1)
-        r (run! (dbg "running") (dbg @empty) @foo)]
-    (dbg (._dirty? empty))
-    (dbg (._check-dirty? empty))
-    (dbg (._check-dirty? empty))
+        empty (reaction (swap! spy inc) 1)
+        r (run! @empty @foo)]
     (is (= @spy 1) "a")
     (swap! foo inc)
     (is (nil? (r/flush)))

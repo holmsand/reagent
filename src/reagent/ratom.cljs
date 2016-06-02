@@ -434,25 +434,25 @@
 
   (_check-dirty? [this exec]
     #_(._dirty? this)
-    (cond
-      (not (._dirty? this)) false
-      (nil? watching) true
-      :else
-      (let [dirty (some
+    (let [dirty (cond
+                  (not (._dirty? this)) false
+                  (nil? watching) true
+                  :else
+                  (some
                    (fn [r]
                      (if (some? (.-_check-dirty? r))
                        (._check-dirty? r true)
                        (< age (.-age r))))
-                   watching)]
-        (if dirty
-          (if exec
-            (let [os state]
-              (do (._run this true)
-                  ;; (assert (not (._dirty? this)))
-                  (not= state os)))
-            true)
-          (do (set! age generation)
-              false)))))
+                   watching))]
+      (if dirty
+        (if exec
+          (let [os state]
+            (do (._run this true)
+                ;; (assert (not (._dirty? this)))
+                (not= state os)))
+          true)
+        (do (set! age generation)
+            false))))
 
   (_handle-change [this]
     (when true; (._dirty? this)
@@ -495,15 +495,16 @@
           (notify-r this)))))
 
   (_handle-result [this res derefed]
-    (if-not (arr-eq derefed watching)
-      ;; Optimize common case where derefs occur in same order
-      (._update-watching this derefed)
-      (if (nil? watching)
-        (set! watching #js[])))
     (let [oldstate state]
       (set! age generation)
+      (when-not nocache?)
+      (set! state res)
+      (if-not (arr-eq derefed watching)
+        ;; Optimize common case where derefs occur in same order
+        (._update-watching this derefed)
+        (if (nil? watching)
+          (set! watching #js[])))
       (when-not nocache?
-        (set! state res)
         (._maybe-notify this oldstate res)))
     res)
 
@@ -544,7 +545,8 @@
             (._maybe-notify this oldstate state)))
         (do
           (notify-deref-watcher! this)
-          (when (._check-dirty? this false)
+          (._check-dirty? this true)
+          #_(when (._check-dirty? this false)
             (._run this false)))))
     state)
 
@@ -563,7 +565,7 @@
       (set! state nil)
       (set! auto-run nil)
       ;; (set! dirty? true)
-      ;; (set! age (dec age))
+      (set! age -1)
       (doseq [w (set wg)]
         (-remove-reaction w this))
       (when (some? (.-on-dispose this))

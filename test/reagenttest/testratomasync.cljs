@@ -60,19 +60,20 @@
         c3 (ar
             (fn []
               (swap! c3-count inc)
-              (+ @c1 @c2)))]
+              (dbg (+ @c1 @c2))))]
     (is (= @c3 1))
     (is (= @c3-count 1) "t1")
     (swap! start inc)
     (is (= @c3-count 1))
     (sync)
     (is (= @c3-count 2) "t2")
-    (is (= @c3 2))
+    (dbg (._check-dirty? c3))
+    (is (= @c3 2) "c32")
     (is (= @c3-count 2) "t3")
     (dispose c3)
     (is (= (running) runs))
     (sync)
-    (is (= @c3 2))
+    (is (= @c3 2) "recover")
     (is (= (running) runs))))
 
 (deftest test-from-reflex
