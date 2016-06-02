@@ -376,7 +376,7 @@
 (defprotocol IReaction
   (add-on-dispose! [this f]))
 
-(deftype Reaction [f ^:mutable state ^boolean nocache?
+(deftype Reaction [f ^:mutable state ^:mutable ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
                    ^:mutable caught ^:mutable ^number age
                    ^:mutable ^number last-update]
@@ -429,7 +429,7 @@
   (_dirty? [this]
     (not (== age generation)))
 
-  (_check-dirty? [this exec]
+  (_check-dirty? [this notify]
     (let [dirty (cond
                   (== age -1) true
                   (not (._dirty? this)) false
@@ -437,17 +437,15 @@
                   (some
                    (fn [r]
                      (if (some? (.-_check-dirty? r))
-                       (._check-dirty? r true)
+                       (._check-dirty? r false)
                        (< age (.-age r))))
                    watching))]
       (if dirty
-        (if exec
-          (let [os state]
-            (do (._exec this)
-                ;; TODO: Do = only once.
-                (or (== age last-update)
-                    (not= state os))))
-          true)
+        (let [os state]
+          (do (._exec this notify)
+              ;; TODO: Do = only once.
+              (or (== age last-update)
+                  (not= state os))))
         (do (set! age generation)
             false))))
 
@@ -515,13 +513,19 @@
     (when (some? no-cache)
       (set! (.-nocache? this) no-cache)))
 
-  (_exec [this]
+  (_exec [this notify]
     (let [non-reactive (nil? *ratom-context*)]
       (if (and non-reactive (nil? auto-run))
         (let [oldstate state]
           (set! state (f))
           (._maybe-notify this oldstate state))
-        (._run this true))))
+        (if notify
+          (._run this true)
+          (try
+            (set! nocache? true)
+            (._run this true)
+            (finally
+              (set! nocache? true)))))))
 
   IRunnable
   (run [this]
