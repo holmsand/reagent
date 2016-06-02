@@ -467,16 +467,16 @@
                         :b (r/atom 2)})
         val (fn [a] @(get @tracks a))
         plus (fn [a b]
-               (if (> (val a) 0)
-                 (+ (val a)
-                    (if (< (val a) 5)
-                      (val b)
-                      (dbg (try (dbg (val b))
-                                (catch :default e
-                                  (dbg "hej")
-                                  (dbg (val a))
-                                  (val a))))))
-                 (val a)))
+               (dbg (if (> (val a) 0)
+                      (+ (val a)
+                         (if (< (val a) 5)
+                           (val b)
+                           (dbg (try (dbg (val b))
+                                     (catch :default e
+                                       (dbg "hej")
+                                       (dbg (val a))
+                                       (val a))))))
+                      (val a))))
         _ (swap! tracks assoc :c (r/track plus :a :b))
         t (r/track! (fn []
                       (val :c)))]
@@ -496,9 +496,9 @@
     (is (thrown-with-msg? :default #"Recursion limit in Reaction exceeded"
                           (r/flush)))
     (dbg t)
-    (reset! state 11)
+    (reset! state -11)
     (dbg state)
     (dbg (r/flush))
-    (is (= @t 21))
+    (is (= @t -11))
     (dispose t)
     (is (= runs (running)))))

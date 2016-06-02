@@ -36,9 +36,9 @@
 
 (defn- check-depth [r]
   (when-some [d (.-rundepth r)]
-    (when (> d 2)
-      (dbg d)
-      #_(set! (.-rundepth r) 1)
+    (when (> d 8)
+      (dbg [:rundepth d])
+      (set! (.-rundepth r) 0)
       (throw (js/Error. "Recursion limit in Reaction exceeded")))))
 
 (defn- in-context [obj f ^boolean update ^boolean check]
@@ -62,7 +62,8 @@
     (set! (.-rundepth r) (inc (if-some [d (.-rundepth r)] d 0)))
     (in-context r f true check)
     (finally
-      (set! (.-rundepth r) (dec (.-rundepth r))))))
+      (let [d (.-rundepth r)]
+        (when (pos? d) (set! (.-rundepth r) (dec d)))))))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
@@ -471,6 +472,7 @@
     res)
 
   (_run [this ^boolean check]
+    (assert (nil? caught))
     (set! dirty? false)
     (deref-capture f this check))
 
