@@ -60,14 +60,14 @@
         c3 (ar
             (fn []
               (swap! c3-count inc)
-              (dbg (+ @c1 @c2))))]
+              (+ @c1 @c2)))]
     (is (= @c3 1))
     (is (= @c3-count 1) "t1")
     (swap! start inc)
     (is (= @c3-count 1))
     (sync)
     (is (= @c3-count 2) "t2")
-    (dbg (._check-dirty? c3))
+
     (is (= @c3 2) "c32")
     (is (= @c3-count 2) "t3")
     (dispose c3)

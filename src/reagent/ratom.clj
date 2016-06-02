@@ -45,8 +45,7 @@
          (when-some [c# reagent.ratom/*ratom-context*]
            (when (== (.-let-generation ~v) (.-ratomGeneration c#))
              (d/error (str "Warning: The same with-let is being used more "
-                           "than once in the same reactive context. "
-                           (.-let-generation ~v) ", " (.-ratomGeneration c#))
+                           "than once in the same reactive context.")
                       ))
            (set! (.-let-generation ~v) (.-ratomGeneration c#))))
        (let ~bs
