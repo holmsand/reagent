@@ -14,7 +14,7 @@
 
 (enable-console-print!)
 
-(def test-results (r/atom nil))
+(defonce test-results (r/atom nil))
 
 (def test-box-style {:position 'absolute
                      :margin-left -35

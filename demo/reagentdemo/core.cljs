@@ -7,7 +7,7 @@
             [reagentdemo.news :as news]
             [reagent.debug :refer-macros [dbg println]]))
 
-(def test-results (r/atom nil))
+(defonce test-results (r/atom nil))
 
 (def github {:href "https://github.com/reagent-project/reagent"})
 
