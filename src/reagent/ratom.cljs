@@ -105,26 +105,27 @@
 
 (defonce ^:private ratom-queue nil)
 
+(def ^:private -no-value #js {})
+(def ^:private -unique-value #js {})
+
 (defn- ratom-enqueue [a old]
   (set! generation (inc generation))
   (set! (.-age a) generation)
-  (when-not (true? (.-queued a))
+  (when (identical? (.-oldstate a) -no-value)
     (when (nil? ratom-queue)
       (set! ratom-queue (array))
       (batch/schedule))
-    (set! (.-queued a) true)
-    (.push ratom-queue a)
-    (.push ratom-queue old)))
+    (set! (.-oldstate a) old)
+    (.push ratom-queue a)))
 
 (defn flush! []
   (let [q ratom-queue]
     (when-not (nil? q)
       (set! ratom-queue nil)
-      (dotimes [x (/ (alength q) 2)]
-        (let [i (* x 2)
-              a (aget q i)
-              old-state (aget q (inc i))]
-          (set! (.-queued a) false)
+      (dotimes [i (alength q)]
+        (let [a (aget q i)
+              old-state (.-oldstate a)]
+          (set! (.-oldstate a) -no-value)
           (when (not= old-state (.-state a))
             (notify-r a)))))))
 
@@ -139,7 +140,8 @@
   (-add-reaction [this r])
   (-remove-reaction [this r]))
 
-(deftype RAtom [^:mutable state meta validator ^:mutable watches]
+(deftype RAtom [^:mutable state meta validator ^:mutable watches
+                ^:mutable oldstate]
   IAtom
   IReactiveAtom
 
@@ -176,7 +178,10 @@
   (-pr-writer [a w opts] (pr-atom a w opts "Atom:"))
 
   IReactionWatchable
-  (-add-reaction [this r]         (add-r this r))
+  (-add-reaction [this r]
+    (when-not (identical? oldstate -no-value)
+      (set! oldstate -unique-value))
+    (add-r this r))
   (-remove-reaction [this r]      (remove-r this r))
 
   IWatchable
@@ -189,8 +194,8 @@
 
 (defn atom
   "Like clojure.core/atom, except that it keeps track of derefs."
-  ([x] (RAtom. x nil nil nil))
-  ([x & {:keys [meta validator]}] (RAtom. x meta validator nil)))
+  ([x] (RAtom. x nil nil nil -no-value))
+  ([x & {:keys [meta validator]}] (RAtom. x meta validator nil -no-value)))
 
 
 ;;; track

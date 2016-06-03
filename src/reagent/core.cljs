@@ -104,7 +104,6 @@ Returns the mounted component instance."
   ClojureScript). To get around this you'll have to introduce a layer
   of indirection, for example by using `(render [#'foo])` instead."
   []
-  (ratom/flush!)
   (dom/force-update-all)
   (batch/flush-after-render))
 
@@ -171,7 +170,6 @@ Equivalent to (swap! (state-atom this) merge new-state)"
   ([this]
    (force-update this false))
   ([this deep]
-   (ratom/flush!)
    (util/force-update this deep)
    (batch/flush-after-render)))
 
