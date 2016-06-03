@@ -78,9 +78,9 @@
     (dispose const)
     (swap! start inc)
     (sync)
-    (is (<= 4 @count 5))
+    (is (= @count 3))
     (is (= @const 11))
-    (is (<= 4 @count 5))
+    (is (= @count 4))
     (is (= (running) runs))))
 
 (deftest double-dependency
@@ -139,7 +139,7 @@
 
       (reset! a -1)
       (is (= @res (+ 2 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed 3))
       (is (= @c-changed 0))
 
       (reset! a 2)

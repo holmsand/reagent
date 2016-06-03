@@ -129,7 +129,7 @@
              
       (reset! a -1)
       (is (= @res (+ 2 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed 3))
       (is (= @c-changed 0))
              
       (reset! a 2)

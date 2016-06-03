@@ -211,16 +211,16 @@
     (swap! val inc)
     (is (= [3 3] [@n1 @active]))
     (flush)
-    (is (= [7 3] [@n1 @active]))
+    (is (= [6 3] [@n1 @active]))
     (is (= [1 1 11 11] @res))
 
     (swap! val inc)
     (flush)
-    (is (= [7 1] [@n1 @active]))
+    (is (= [6 1] [@n1 @active]))
     (is (= [11] @res))
 
     (dispose! t)
-    (is (= [7 0] [@n1 @active]))
+    (is (= [6 0] [@n1 @active]))
     (is (= runs (running)))))
 
 (deftest with-let-warning

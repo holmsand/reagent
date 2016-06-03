@@ -44,16 +44,20 @@
 (defn- in-context [obj f ^boolean update ^boolean check ^boolean notify]
   (binding [*ratom-context* obj
             -captured nil]
-    (let [res
-          (if check
-            (._try-exec obj f)
-            (f))]
-      (if update
-        (let [c -captured]
-          (set! *ratom-context* nil)
-          (set! -captured nil)
-          (._handle-result obj res c notify))
-        [res -captured]))))
+    (try
+      (set! (.-execing obj) true)
+      (let [res
+            (if check
+              (._try-exec obj f)
+              (f))]
+        (if update
+          (let [c -captured]
+            (set! *ratom-context* nil)
+            (set! -captured nil)
+            (._handle-result obj res c notify))
+          [res -captured]))
+      (finally
+        (set! (.-execing obj) false)))))
 
 (defn- deref-capture [f r ^boolean check notify]
   (when (dev?)
@@ -421,7 +425,6 @@
       (-deref this)))
 
   (_check-dirty? [this notify]
-    (assert (bool? notify))
     (let [dirty (cond
                   (== age -1) true
                   (== age generation) false
@@ -429,12 +432,14 @@
                   (some
                    (fn [r]
                      (if (some? (.-_check-dirty? r))
-                       (._check-dirty? r false)
+                       (._check-dirty? r true)
                        (< age (.-age r))))
                    watching))]
       (if dirty
         (let [os state]
           (do (._exec this notify)
+              #_(assert (= age generation)
+                      (str [age generation]))
               (if (== age last-update)
                 false
                 (not= state os))))
@@ -442,12 +447,14 @@
             false))))
 
   (_handle-change [this]
-    (if (nil? auto-run)
-      (when-not (== age -1)
-        (._run this true true))
-      (if (true? auto-run)
-        (._run this false true)
-        (auto-run this))))
+    (if-not (or (== age generation last-update)
+                (.-execing this))
+      (if (nil? auto-run)
+        (when-not (== age -1)
+          (._run this true true))
+        (if (true? auto-run)
+          (._run this false true)
+          (auto-run this)))))
 
   (_update-watching [this derefed]
     (let [new (set derefed)
@@ -468,6 +475,8 @@
         (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
+    (when-not (.-execing this)
+      (error "Not running"))
     (let [has-w (some? watches)
           has-r (some? (.-reactions this))]
       (when (or has-w has-r)
@@ -481,8 +490,8 @@
   (_handle-result [this res derefed notify]
     (let [oldstate state]
       (set! age generation)
-      (when-not nocache?)
-      (set! state res)
+      (when-not nocache?
+        (set! state res))
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
@@ -507,8 +516,14 @@
     (let [non-reactive (nil? *ratom-context*)]
       (if (and non-reactive (nil? auto-run))
         (let [oldstate state]
-          (set! state (f))
-          (._maybe-notify this oldstate state))
+          (set! (.-execing this) true)
+          (try
+            (set! state (f))
+            ;; (set! age generation)
+            (when true ;notify
+              (._maybe-notify this oldstate state))
+            (finally
+              (set! (.-execing this) false))))
         (._run this true notify))))
 
   IRunnable
