@@ -459,3 +459,17 @@
     (r/flush)
     (dispose r1)
     (is (= runs (running)))))
+
+(deftest empty-function
+  (let [runs (running)
+        spy (atom 0)
+        foo (r/atom 0)
+        empty (reaction (swap! spy inc) 1)
+        r (run! @empty @foo)]
+    (is (= @spy 1) "a")
+    (swap! foo inc)
+    (is (nil? (r/flush)))
+    (is (= @spy 1) "b")
+    (is (= @r @foo))
+    (dispose r)
+    (is (= runs (running)))))
