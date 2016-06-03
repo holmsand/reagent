@@ -18,12 +18,6 @@
 
 ;;; Utilities
 
-(defn- bool? [x]
-  (case x
-    true true
-    false true
-    false))
-
 (defn running []
   (+ @-running))
 
@@ -127,16 +121,13 @@
   (let [q ratom-queue]
     (when-not (nil? q)
       (set! ratom-queue nil)
-      (let [len (alength q)]
-        (loop [i 0]
-          (when (< i len)
-            (let [a (aget q i)
-                  old (aget q (inc i))
-                  new (.-state a)]
-              (set! (.-queued a) false)
-              (when (not= old new)
-                (notify-r a)))
-            (recur (+ 2 i))))))))
+      (dotimes [x (/ (alength q) 2)]
+        (let [i (* x 2)
+              a (aget q i)
+              old-state (aget q (inc i))]
+          (set! (.-queued a) false)
+          (when (not= old-state (.-state a))
+            (notify-r a)))))))
 
 (set! batch/ratom-flush flush!)
 
@@ -422,22 +413,6 @@
     (binding [*ratom-context* nil]
       (-deref this)))
 
-  (_check-dirty? [this]
-    (let [dirty (cond
-                  (== age generation) false
-                  (nil? watching) true
-                  :else
-                  (some
-                   (fn [r]
-                     (if (some? (.-_check-dirty? r))
-                       (._check-dirty? r)
-                       (< age (.-age r))))
-                   watching))]
-      (if dirty
-        (._exec this true)
-        (set! age generation))
-      false))
-
   (_handle-change [this]
     (when-not (== age generation last-update)
       (if (nil? auto-run)
@@ -493,6 +468,30 @@
   (_run [this ^boolean check]
     (deref-capture f this check))
 
+  (_exec [this]
+    (let [non-reactive (nil? *ratom-context*)]
+      (if (and non-reactive (nil? auto-run))
+        (let [oldstate state]
+          (set! state (f))
+          (set! age generation)
+          (._maybe-notify this oldstate state))
+        (._run this true))))
+
+  (_refresh [this]
+    (let [dirty (cond
+                  (== age generation) false
+                  (nil? watching) true
+                  :else (some
+                         (fn [r]
+                           (if (some? (.-_refresh r))
+                             (._refresh r)
+                             (< age (.-age r))))
+                         watching))]
+      (if dirty
+        (._exec this true)
+        (set! age generation))
+      false))
+
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)
       (set! (.-auto-run this) auto-run))
@@ -502,15 +501,6 @@
       (set! (.-on-dispose this) on-dispose))
     (when (some? no-cache)
       (set! (.-nocache? this) no-cache)))
-
-  (_exec [this]
-    (let [non-reactive (nil? *ratom-context*)]
-      (if (and non-reactive (nil? auto-run))
-        (let [oldstate state]
-          (set! state (f))
-          (set! age generation)
-          (._maybe-notify this oldstate state))
-        (._run this true))))
 
   IRunnable
   (run [this]
@@ -524,7 +514,7 @@
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
-    (._check-dirty? this)
+    (._refresh this)
     state)
 
   IReaction
