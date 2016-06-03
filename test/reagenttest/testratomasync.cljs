@@ -14,7 +14,7 @@
 (defn running []
   (rv/running))
 
-(def testite 10)
+(def testite 1)
 
 (defn dispose [v]
   (rv/dispose! v))
@@ -222,12 +222,12 @@
       (is (= @res 1))
       (is (= @disposed nil))
       (is (= @count-b 2))
-      (is (= @count-c 3)) ;; TODO: Should be 2?
+      (is (= @count-c 2))
       (reset! a 2)
       (is (= @res 1) "unchanged")
       (sync)
       (is (= @res 102) "new value")
-      (is (= @count-c 5)) ;; TODO: Should be 3?
+      (is (= @count-c 3))
       (is (= @disposed true) "should be disposed")
 
       (reset! disposed nil)

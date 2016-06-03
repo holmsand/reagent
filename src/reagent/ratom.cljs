@@ -93,7 +93,10 @@
             w)
         len (alength a)]
     (dotimes [i len]
-      (._handle-change (aget a i)))))
+      (let [r (aget a i)
+            age (.-age this)]
+        (if (>= age (.-age r))
+          (._handle-change r))))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -421,13 +424,12 @@
       (-deref this)))
 
   (_handle-change [this]
-    (when-not (== age generation)
-      (if (nil? auto-run)
-        (when-not (nil? watching)
-          (._run this true))
-        (if (true? auto-run)
-          (._run this false)
-          (auto-run this)))))
+    (if (nil? auto-run)
+      (when-not (nil? watching)
+        (._run this true))
+      (if (true? auto-run)
+        (._run this false)
+        (auto-run this))))
 
   (_update-watching [this derefed]
     (let [new (set derefed)
