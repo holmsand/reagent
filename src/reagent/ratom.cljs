@@ -108,26 +108,13 @@
 (def ^:private -no-value #js {})
 (def ^:private -unique-value #js {})
 
-(defn- ratom-enqueue [a old]
-  (set! generation (inc generation))
-  (set! (.-age a) generation)
-  (when (identical? (.-oldstate a) -no-value)
-    (when (nil? ratom-queue)
-      (set! ratom-queue (array))
-      (batch/schedule))
-    (set! (.-oldstate a) old)
-    (.push ratom-queue a)))
-
 (defn flush! []
   (let [q ratom-queue]
     (when-not (nil? q)
       (set! ratom-queue nil)
       (dotimes [i (alength q)]
-        (let [a (aget q i)
-              old-state (.-oldstate a)]
-          (set! (.-oldstate a) -no-value)
-          (when (not= old-state (.-state a))
-            (notify-r a)))))))
+        (let [a (aget q i)]
+          (._notify a))))))
 
 (set! batch/ratom-flush flush!)
 
@@ -141,7 +128,7 @@
   (-remove-reaction [this r]))
 
 (deftype RAtom [^:mutable state meta validator ^:mutable watches
-                ^:mutable oldstate]
+                ^:mutable oldstate ^:mutable ^number age]
   IAtom
   IReactiveAtom
 
@@ -153,6 +140,23 @@
     (notify-deref-watcher! this)
     state)
 
+  Object
+  (_enqueue [a old]
+    (set! generation (inc generation))
+    (set! age generation)
+    (when (identical? oldstate -no-value)
+      (when (nil? ratom-queue)
+        (set! ratom-queue (array))
+        (batch/schedule))
+      (set! oldstate old)
+      (.push ratom-queue a)))
+
+  (_notify [a]
+    (let [old oldstate]
+      (set! oldstate -no-value)
+      (when (not= old state)
+        (notify-r a))))
+
   IReset
   (-reset! [a new-value]
     (when-not (nil? validator)
@@ -160,7 +164,7 @@
     (let [old-value state]
       (set! state new-value)
       (when-not (identical? old-value new-value)
-        (ratom-enqueue a old-value))
+        (._enqueue a old-value))
       (when-not (nil? watches)
         (notify-w a old-value new-value))
       new-value))
@@ -194,8 +198,8 @@
 
 (defn atom
   "Like clojure.core/atom, except that it keeps track of derefs."
-  ([x] (RAtom. x nil nil nil -no-value))
-  ([x & {:keys [meta validator]}] (RAtom. x meta validator nil -no-value)))
+  ([x] (RAtom. x nil nil nil -no-value -1))
+  ([x & {:keys [meta validator]}] (RAtom. x meta validator nil -no-value -1)))
 
 
 ;;; track
