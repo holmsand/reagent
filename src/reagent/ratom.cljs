@@ -8,8 +8,8 @@
 
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
-(defonce ^:private generation 0)
-(defonce ^:private with-let-gen 0)
+(defonce ^:private generation 1)
+(defonce ^:private with-let-gen 1)
 (defonce ^:private -running (clojure.core/atom 0))
 
 (defn ^boolean reactive? []
@@ -44,20 +44,16 @@
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured nil]
-    (try
-      (set! (.-execing obj) true)
-      (let [res
-            (if check
-              (._try-exec obj f)
-              (f))]
-        (if update
-          (let [c -captured]
-            (set! *ratom-context* nil)
-            (set! -captured nil)
-            (._handle-result obj res c))
-          [res -captured]))
-      (finally
-        (set! (.-execing obj) false)))))
+    (let [res
+          (if check
+            (._try-exec obj f)
+            (f))]
+      (if update
+        (let [c -captured]
+          (set! *ratom-context* nil)
+          (set! -captured nil)
+          (._handle-result obj res c))
+        [res -captured]))))
 
 (defn- deref-capture [f r ^boolean check]
   (when (dev?)
@@ -374,6 +370,8 @@
 (defprotocol IReaction
   (add-on-dispose! [this f]))
 
+(def ^:private -empty-array #js[])
+
 (deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable watches ^:mutable auto-run
                    ^:mutable caught ^:mutable ^number age
@@ -426,8 +424,8 @@
 
   (_check-dirty? [this]
     (let [dirty (cond
-                  (== age -1) true
                   (== age generation) false
+                  (nil? watching) true
                   :else
                   (some
                    (fn [r]
@@ -441,10 +439,9 @@
       false))
 
   (_handle-change [this]
-    (when-not (or (== age generation last-update)
-                  (.-execing this))
+    (when-not (== age generation last-update)
       (if (nil? auto-run)
-        (when-not (== age -1)
+        (when-not (nil? watching)
           (._run this true))
         (if (true? auto-run)
           (._run this false)
@@ -469,12 +466,10 @@
         (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
-    (when-not (.-execing this)
-      (error "Not running"))
     (let [has-w (some? watches)
           has-r (some? (.-reactions this))]
+      (set! last-update age)
       (when (or has-w has-r)
-        (set! last-update age)
         (when (not= oldstate newstate)
           (when has-w
             (notify-w this oldstate newstate))
@@ -489,6 +484,8 @@
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
+      (if (and (nil? derefed) (nil? watching))
+        (set! watching -empty-array))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
@@ -510,14 +507,9 @@
     (let [non-reactive (nil? *ratom-context*)]
       (if (and non-reactive (nil? auto-run))
         (let [oldstate state]
-          (set! (.-execing this) true)
-          (try
-            (set! state (f))
-            ;; TODO: Why not?
-            ;; (set! age generation)
-            (._maybe-notify this oldstate state)
-            (finally
-              (set! (.-execing this) false))))
+          (set! state (f))
+          (set! age generation)
+          (._maybe-notify this oldstate state))
         (._run this true))))
 
   IRunnable
@@ -528,7 +520,7 @@
   (-deref [this]
     (when-some [e caught]
       (set! caught nil)
-      (set! age (dec age))
+      (set! age 0)
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
@@ -550,6 +542,7 @@
       (set! state nil)
       (set! auto-run nil)
       (set! age -1)
+      (set! last-update 0)
       (doseq [w (set wg)]
         (-remove-reaction w this))
       (when (some? (.-on-dispose this))
