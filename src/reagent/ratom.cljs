@@ -105,8 +105,8 @@
 
 (defonce ^:private ratom-queue nil)
 
-(def ^:private -no-value #js {})
-(def ^:private -unique-value #js {})
+(defonce ^:private -no-value #js {})
+(defonce ^:private -unique-value #js {})
 
 (defn flush! []
   (let [q ratom-queue]
