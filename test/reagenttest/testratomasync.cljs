@@ -129,7 +129,7 @@
       (is (= @b-changed 1))
       (sync)
 
-      (is (= @b-changed 3))
+      (is (= @b-changed 2))
       (is (= @c-changed 0))
       (is (= @res (+ 2 @a)))
              

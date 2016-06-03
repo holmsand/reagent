@@ -424,7 +424,7 @@
     (binding [*ratom-context* nil]
       (-deref this)))
 
-  (_check-dirty? [this notify]
+  (_check-dirty? [this]
     (let [dirty (cond
                   (== age -1) true
                   (== age generation) false
@@ -432,23 +432,17 @@
                   (some
                    (fn [r]
                      (if (some? (.-_check-dirty? r))
-                       (._check-dirty? r true)
+                       (._check-dirty? r)
                        (< age (.-age r))))
                    watching))]
       (if dirty
-        (let [os state]
-          (do (._exec this notify)
-              #_(assert (= age generation)
-                      (str [age generation]))
-              (if (== age last-update)
-                false
-                (not= state os))))
-        (do (set! age generation)
-            false))))
+        (._exec this true)
+        (set! age generation))
+      false))
 
   (_handle-change [this]
-    (if-not (or (== age generation last-update)
-                (.-execing this))
+    (when-not (or (== age generation last-update)
+                  (.-execing this))
       (if (nil? auto-run)
         (when-not (== age -1)
           (._run this true true))
@@ -488,6 +482,8 @@
             (notify-r this))))))
 
   (_handle-result [this res derefed notify]
+    ;; (when-not notify
+    ;;   (error "not notify" notify))
     (let [oldstate state]
       (set! age generation)
       (when-not nocache?
@@ -495,7 +491,7 @@
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
-      (when (and notify (not nocache?))
+      (when (and (not nocache?))
         (._maybe-notify this oldstate res)))
     res)
 
@@ -538,7 +534,7 @@
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
-    (._check-dirty? this true)
+    (._check-dirty? this)
     state)
 
   IReaction
