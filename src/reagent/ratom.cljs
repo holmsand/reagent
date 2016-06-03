@@ -41,7 +41,7 @@
 
 (declare ^:dynamic -captured)
 
-(defn- in-context [obj f ^boolean update ^boolean check ^boolean notify]
+(defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured nil]
     (try
@@ -54,15 +54,15 @@
           (let [c -captured]
             (set! *ratom-context* nil)
             (set! -captured nil)
-            (._handle-result obj res c notify))
+            (._handle-result obj res c))
           [res -captured]))
       (finally
         (set! (.-execing obj) false)))))
 
-(defn- deref-capture [f r ^boolean check notify]
+(defn- deref-capture [f r ^boolean check]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
-  (in-context r f true check notify))
+  (in-context r f true check))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
@@ -445,9 +445,9 @@
                   (.-execing this))
       (if (nil? auto-run)
         (when-not (== age -1)
-          (._run this true true))
+          (._run this true))
         (if (true? auto-run)
-          (._run this false true)
+          (._run this false)
           (auto-run this)))))
 
   (_update-watching [this derefed]
@@ -481,9 +481,7 @@
           (when has-r
             (notify-r this))))))
 
-  (_handle-result [this res derefed notify]
-    ;; (when-not notify
-    ;;   (error "not notify" notify))
+  (_handle-result [this res derefed]
     (let [oldstate state]
       (set! age generation)
       (when-not nocache?
@@ -491,12 +489,12 @@
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
-      (when (and (not nocache?))
+      (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
 
-  (_run [this ^boolean check notify]
-    (deref-capture f this check notify))
+  (_run [this ^boolean check]
+    (deref-capture f this check))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)
@@ -508,23 +506,23 @@
     (when (some? no-cache)
       (set! (.-nocache? this) no-cache)))
 
-  (_exec [this notify]
+  (_exec [this]
     (let [non-reactive (nil? *ratom-context*)]
       (if (and non-reactive (nil? auto-run))
         (let [oldstate state]
           (set! (.-execing this) true)
           (try
             (set! state (f))
+            ;; TODO: Why not?
             ;; (set! age generation)
-            (when true ;notify
-              (._maybe-notify this oldstate state))
+            (._maybe-notify this oldstate state)
             (finally
               (set! (.-execing this) false))))
-        (._run this true notify))))
+        (._run this true))))
 
   IRunnable
   (run [this]
-    (._run this false true))
+    (._run this false))
 
   IDeref
   (-deref [this]
@@ -583,7 +581,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture f r false true)]
+        res (deref-capture f r false)]
     (when-not (nil? (.-watching r))
       (set! temp-reaction (make-reaction nil))
       (._set-opts r opts)
@@ -593,7 +591,7 @@
     res))
 
 (defn check-derefs [f]
-  (let [[res captured] (in-context #js{} f false false false)]
+  (let [[res captured] (in-context #js{} f false false)]
     [res (some? captured)]))
 
 
