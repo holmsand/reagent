@@ -422,7 +422,7 @@
       (-deref this)))
 
   (_handle-change [this]
-    (when-not (== age generation last-update)
+    (when-not (== age generation)
       (if (nil? auto-run)
         (when-not (nil? watching)
           (._run this true))
@@ -461,9 +461,10 @@
 
   (_handle-result [this res derefed]
     (let [oldstate state]
-      (set! age generation)
       (when-not nocache?
+        (set! generation (inc generation))
         (set! state res))
+      (set! age generation)
       (if-not (arr-eq derefed watching)
         ;; Optimize common case where derefs occur in same order
         (._update-watching this derefed))
@@ -480,6 +481,7 @@
     (let [non-reactive (nil? *ratom-context*)]
       (if (and non-reactive (nil? auto-run))
         (let [oldstate state]
+          (set! generation (inc generation))
           (set! state (f))
           (set! age generation)
           (._maybe-notify this oldstate state))

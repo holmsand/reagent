@@ -109,8 +109,8 @@
           a (rv/atom 0)
           a1 (reaction (inc @a))
           a2 (reaction @a)
-          b-changed (rv/atom 0)
-          c-changed (rv/atom 0)
+          b-changed (atom 0)
+          c-changed (atom 0)
           b (reaction
              (swap! b-changed inc)
              (inc @a1))
