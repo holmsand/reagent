@@ -21,30 +21,16 @@
 (defn running []
   (+ @-running))
 
-(defn- ^number arr-len [x]
-  (if (nil? x) 0 (alength x)))
-
-(defn- ^boolean arr-eq [x y]
-  (let [len (arr-len x)]
-    (and (== len (arr-len y))
-         (loop [i 0]
-           (or (== i len)
-               (if (identical? (aget x i) (aget y i))
-                 (recur (inc i))
-                 false))))))
-
 (declare ^:dynamic -captured)
 
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
-            -captured nil]
+            -captured {}]
     (let [res (if check
                 (._try-exec obj f)
                 (f))]
       (if update
         (let [c -captured]
-          (set! *ratom-context* nil)
-          (set! -captured nil)
           (._handle-result obj res c true))
         [res -captured]))))
 
@@ -55,9 +41,7 @@
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
-    (if (nil? -captured)
-      (set! -captured (array derefed))
-      (.push -captured derefed))))
+    (set! -captured (assoc -captured derefed nil))))
 
 (defn- add-w [this key f]
   (set! (.-watches this) (assoc (.-watches this) key f)))
@@ -424,8 +408,8 @@
         (auto-run this))))
 
   (_update-watching [this derefed]
-    (let [new (set derefed)
-          old (set watching)]
+    (let [new (set (keys derefed))
+          old (set (keys watching))]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
         (-add-reaction w this))
@@ -457,11 +441,8 @@
       (when-not nocache?
         (set! state res))
       (when reactive
-        (when-not (arr-eq derefed watching)
-          ;; Optimize common case where derefs occur in same order
-          (._update-watching this derefed))
-        (when (and (nil? derefed) (nil? watching))
-          (set! watching -empty-array)))
+        (when-not (= derefed watching)
+          (._update-watching this derefed)))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
@@ -484,7 +465,7 @@
                            (if (instance? Reaction r)
                              (._refresh r)
                              (< age (.-age r))))
-                         watching))]
+                         (keys watching)))]
       (if dirty
         (._run this)
         (set! age generation))
@@ -525,12 +506,12 @@
   IDisposable
   (dispose! [this]
     (let [s state
-          wg watching]
+          wg (keys watching)]
       (set! watching nil)
       (set! state nil)
       (set! auto-run nil)
       (set! age -1)
-      (doseq [w (set wg)]
+      (doseq [w wg]
         (-remove-reaction w this))
       (when (some? (.-on-dispose this))
         (.on-dispose this s))
@@ -572,7 +553,7 @@
 
 (defn check-derefs [f]
   (let [[res captured] (in-context #js{} f false false)]
-    [res (some? captured)]))
+    [res (not (empty? captured))]))
 
 
 ;;; wrap
