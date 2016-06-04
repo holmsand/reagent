@@ -60,8 +60,8 @@
 
 (defn- add-r [this r]
   (let [w (.-reactions this)
-        w' (if (nil? w) #{r} (conj w r))]
-    (set! (.-reactions this) (check-watches w w'))
+        w (if (nil? w) #{} w)]
+    (set! (.-reactions this) (check-watches w (conj w r)))
     (set! (.-reactionsArr this) nil)))
 
 (defn- remove-r [this r]
@@ -74,12 +74,10 @@
         a (if (nil? w)
             ;; Copy watches to array for speed
             (set! (.-reactionsArr this) (into-array (.-reactions this)))
-            w)
-        len (alength a)]
-    (dotimes [i len]
-      (let [r (aget a i)
-            age (.-age this)]
-        (if (>= age (.-age r))
+            w)]
+    (dotimes [i (alength a)]
+      (let [r (aget a i)]
+        (if (>= (.-age this) (.-age r))
           (._handle-change r))))))
 
 (defn- pr-atom [a writer opts s]
@@ -426,8 +424,8 @@
         (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (some? (.-watches this))
-          has-r (some? reactions)]
+    (let [has-w (pos? (count (.-watches this)))
+          has-r (pos? (count reactions))]
       (when (or has-w has-r)
         (when (not= oldstate newstate)
           (when has-w
