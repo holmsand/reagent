@@ -45,7 +45,7 @@
         (let [c -captured]
           (set! *ratom-context* nil)
           (set! -captured nil)
-          (._handle-result obj res c))
+          (._handle-result obj res c true))
         [res -captured]))))
 
 (defn- deref-capture [f r ^boolean check]
@@ -426,9 +426,9 @@
   (_handle-change [this]
     (if (nil? auto-run)
       (when-not (nil? watching)
-        (._run this true))
+        (._run-reactive this true))
       (if (true? auto-run)
-        (._run this false)
+        (._run-reactive this false)
         (auto-run this))))
 
   (_update-watching [this derefed]
@@ -459,34 +459,29 @@
           (when has-r
             (notify-r this))))))
 
-  (_handle-result [this res derefed]
+  (_handle-result [this res derefed reactive]
     (let [oldstate state]
       (set! age (set! generation (inc generation)))
       (when-not nocache?
         (set! state res))
-      (if-not (arr-eq derefed watching)
-        ;; Optimize common case where derefs occur in same order
-        (._update-watching this derefed))
-      (if (and (nil? derefed) (nil? watching))
-        (set! watching -empty-array))
+      (when reactive
+        (when-not (arr-eq derefed watching)
+          ;; Optimize common case where derefs occur in same order
+          (._update-watching this derefed))
+        (when (and (nil? derefed) (nil? watching))
+          (set! watching -empty-array)))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
 
-  (_run [this ^boolean check]
+  (_run-reactive [this check]
     (deref-capture f this check))
 
-  (_exec [this]
-    ;; TODO: Merge with _run
-    (let [non-reactive (nil? *ratom-context*)]
-      (if (and non-reactive (nil? auto-run))
-        (let [oldstate state]
-          (let [res (f)]
-            (set! age (set! generation (inc generation)))
-            (when-not nocache?
-              (set! state res)
-              (._maybe-notify this oldstate state))))
-        (._run this (nil? auto-run)))))
+  (_run [this]
+    (if (and (nil? *ratom-context*)
+             (nil? auto-run))
+      (._handle-result this (f) nil false)
+      (._run-reactive this (nil? auto-run))))
 
   (_refresh [this]
     (let [dirty (cond
@@ -499,7 +494,7 @@
                              (< age (.-age r))))
                          watching))]
       (if dirty
-        (._exec this true)
+        (._run this)
         (set! age generation))
       false))
 
@@ -515,7 +510,7 @@
 
   IRunnable
   (run [this]
-    (._run this false))
+    (._run-reactive this false))
 
   IDeref
   (-deref [this]
