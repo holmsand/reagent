@@ -375,7 +375,7 @@
 (def ^:private -empty-array #js[])
 
 (deftype Reaction [f ^:mutable state ^boolean nocache?
-                   ^:mutable watching ^:mutable watches ^:mutable auto-run
+                   ^:mutable watching ^:mutable reactions ^:mutable auto-run
                    ^:mutable caught ^:mutable ^number age]
   IAtom
   IReactiveAtom
@@ -384,25 +384,17 @@
   (-add-reaction [this r]
     (add-r this r))
   (-remove-reaction [this r]
-    (let [was-empty (and (empty? (.-reactions this))
-                         (empty? watches))]
+    (let [was-empty (empty? reactions)]
       (remove-r this r)
       (when (and (not was-empty)
-                 (empty? (.-reactions this))
-                 (empty? watches)
+                 (empty? reactions)
                  (nil? auto-run))
         (dispose! this))))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
   (-add-watch [this key f]        (add-w this key f))
-  (-remove-watch [this key]
-    (let [was-empty (empty? watches)]
-      (remove-w this key)
-      (when (and (not was-empty)
-                 (empty? watches)
-                 (nil? auto-run))
-        (dispose! this))))
+  (-remove-watch [this key]       (remove-w this key))
 
   IReset
   (-reset! [a newval]
@@ -450,8 +442,8 @@
         (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (some? watches)
-          has-r (some? (.-reactions this))]
+    (let [has-w (some? (.-watches this))
+          has-r (some? reactions)]
       (when (or has-w has-r)
         (when (not= oldstate newstate)
           (when has-w
