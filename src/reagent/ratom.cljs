@@ -417,6 +417,7 @@
       (set! caught nil)
       (f)
       (catch :default e
+        (error "Error in Reaction: " e)
         (set! state e)
         (set! caught e)
         (set! age -1))))
@@ -444,7 +445,8 @@
     res)
 
   (_run-reactive [this]
-    (deref-capture f this (nil? auto-run)))
+    (deref-capture f this (and (nil? auto-run)
+                               (some? watching))))
 
   (_run [this]
     (if (and (nil? *ratom-context*)
@@ -457,6 +459,7 @@
                   (== age generation) false
                   (nil? watching) true
                   :else (some (fn [r]
+                                (assert (not (identical? r this)))
                                 (if (instance? Reaction r)
                                   (._refresh r)
                                   (<= age (.-age r))))
@@ -484,7 +487,7 @@
   (-deref [this]
     (when-some [e caught]
       (set! caught nil)
-      (set! age 0)
+      (set! age -1)
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))

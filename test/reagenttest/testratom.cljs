@@ -412,7 +412,8 @@
     (is (= @count 1))
     (is (thrown? :default (do
                             (swap! state inc)
-                            (rv/flush!))))
+                            (debug/track-warnings
+                             #(rv/flush!)))))
     (is (= @count 2))
     (is (thrown? :default @ref))
     (swap! state inc)
