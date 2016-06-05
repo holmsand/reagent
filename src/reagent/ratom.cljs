@@ -31,7 +31,7 @@
                 (f))]
       (if update
         (let [c -captured]
-          (._handle-result obj res c true))
+          (._handle-result obj res c))
         [res -captured]))))
 
 (defn- deref-capture [f r ^boolean check]
@@ -398,12 +398,10 @@
       (-deref this)))
 
   (_handle-change [this]
-    (if (nil? auto-run)
-      (when-not (nil? watching)
-        (._run-reactive this true))
-      (if (true? auto-run)
-        (._run-reactive this false)
-        (auto-run this))))
+    (when-not (nil? watching)
+      (if (ifn? auto-run)
+        (auto-run this)
+        (._run-reactive this))))
 
   (_update-watching [this derefed]
     (let [new (set (keys derefed))
@@ -433,36 +431,35 @@
           (when has-r
             (notify-r this))))))
 
-  (_handle-result [this res derefed reactive]
+  (_handle-result [this res derefed]
     (let [oldstate state]
       (set! age (set! generation (inc generation)))
       (when-not nocache?
         (set! state res))
-      (when reactive
-        (when-not (= derefed watching)
-          (._update-watching this derefed)))
+      (when (and (some? derefed)
+                 (not= derefed watching))
+        (._update-watching this derefed))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
     res)
 
-  (_run-reactive [this check]
-    (deref-capture f this check))
+  (_run-reactive [this]
+    (deref-capture f this (nil? auto-run)))
 
   (_run [this]
     (if (and (nil? *ratom-context*)
              (nil? auto-run))
-      (._handle-result this (f) nil false)
-      (._run-reactive this (nil? auto-run))))
+      (._handle-result this (f) nil)
+      (._run-reactive this)))
 
   (_refresh [this]
     (let [dirty (cond
                   (== age generation) false
                   (nil? watching) true
-                  :else (some
-                         (fn [r]
-                           (if (instance? Reaction r)
-                             (._refresh r)
-                             (< age (.-age r))))
+                  :else (some (fn [r]
+                                (if (instance? Reaction r)
+                                  (._refresh r)
+                                  (<= age (.-age r))))
                          (keys watching)))]
       (if dirty
         (._run this)
@@ -481,7 +478,7 @@
 
   IRunnable
   (run [this]
-    (._run-reactive this false))
+    (._run-reactive this))
 
   IDeref
   (-deref [this]
