@@ -399,9 +399,9 @@
 
   (_handle-change [this]
     (when-not (nil? watching)
-      (if (ifn? auto-run)
-        (auto-run this)
-        (._run-reactive this))))
+      (case auto-run
+        (nil true) (._run-reactive this)
+        (auto-run this))))
 
   (_update-watching [this derefed]
     (let [new (set (keys derefed))
@@ -463,7 +463,7 @@
                                        (instance? Reaction r) (._refresh r)
                                        (<= age (.-age r)) true
                                        :else false))
-                         false watching))]
+                                   false watching))]
       (if dirty
         (._run this)
         (set! age generation))
