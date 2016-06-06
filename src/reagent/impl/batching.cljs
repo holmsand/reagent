@@ -42,7 +42,8 @@
 ;; Set from ratom.cljs
 (defonce ratom-flush (fn []))
 
-(deftype RenderQueue [^:mutable ^boolean scheduled?]
+(deftype RenderQueue [^:mutable ^boolean scheduled?
+                      ^:mutable ^boolean running]
   Object
   (enqueue [this k f]
     (assert (some? f))
@@ -60,7 +61,8 @@
   (schedule [this]
     (when-not scheduled?
       (set! scheduled? true)
-      (next-tick #(.run-queues this))))
+      (when-not running
+        (next-tick #(.run-queues this)))))
 
   (queue-render [this c]
     (.enqueue this "componentQueue" c))
@@ -72,8 +74,24 @@
     (.enqueue this "afterRender" f))
 
   (run-queues [this]
+    (set! running true)
     (set! scheduled? false)
-    (.flush-queues this))
+    (let [start (.now js/Date)
+          _ (try
+              (.flush-queues this)
+              (set! running false)
+              (finally
+                (when running
+                  (set! running false)
+                  (set! scheduled? false))))
+          end (.now js/Date)]
+      (when scheduled?
+        (let [rendtime (- end start)]
+          (if (<= (- end start) 16)
+            (next-tick #(.run-queues this))
+            ;; Skip frame to let browser catch up
+            (js/setTimeout (fn [] (next-tick #(.run-queues this)))
+                           16))))))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
@@ -86,7 +104,7 @@
       (run-queue cs))
     (.flush-after-render this)))
 
-(defonce render-queue (RenderQueue. false))
+(def render-queue (RenderQueue. false false))
 
 (defn flush []
   (.flush-queues render-queue))
