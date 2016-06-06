@@ -127,9 +127,9 @@
 
   Object
   (_enqueue [a old]
-    (set! generation (inc generation))
-    (set! age generation)
-    (when (identical? oldstate -no-value)
+    (set! age (set! generation (inc generation)))
+    (when (and (identical? oldstate -no-value)
+               (pos? (count (.-reactions a))))
       (when (nil? ratom-queue)
         (set! ratom-queue (array))
         (batch/schedule))
