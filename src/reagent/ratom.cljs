@@ -458,12 +458,12 @@
     (let [dirty (cond
                   (== age generation) false
                   (nil? watching) true
-                  :else (some (fn [r]
-                                (assert (not (identical? r this)))
-                                (if (instance? Reaction r)
-                                  (._refresh r)
-                                  (<= age (.-age r))))
-                         (keys watching)))]
+                  :else (reduce-kv (fn [d r _]
+                                     (cond
+                                       (instance? Reaction r) (._refresh r)
+                                       (<= age (.-age r)) true
+                                       :else false))
+                         false watching))]
       (if dirty
         (._run this)
         (set! age generation))
