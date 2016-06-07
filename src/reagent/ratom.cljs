@@ -77,7 +77,7 @@
             w)]
     (dotimes [i (alength a)]
       (let [r (aget a i)]
-        (if (>= (.-age this) (.-age r))
+        (when (>= (.-age this) (.-age r))
           (._handle-change r))))))
 
 (defn- pr-atom [a writer opts s]
@@ -427,6 +427,7 @@
           has-r (pos? (count reactions))]
       (when (or has-w has-r)
         (when (not= oldstate newstate)
+          (set! age (set! generation (inc generation)))
           (when has-w
             (notify-w this oldstate newstate))
           (when has-r
@@ -434,7 +435,6 @@
 
   (_handle-result [this res derefed]
     (let [oldstate state]
-      (set! age (set! generation (inc generation)))
       (when-not nocache?
         (set! state res))
       (when (and (some? derefed)
@@ -445,13 +445,15 @@
     res)
 
   (_run-reactive [this]
+    (set! age generation)
     (deref-capture f this (and (nil? auto-run)
                                (some? watching))))
 
   (_run [this]
     (if (and (nil? *ratom-context*)
              (nil? auto-run))
-      (._handle-result this (f) nil)
+      (do (set! age generation)
+          (._handle-result this (f) nil))
       (._run-reactive this)))
 
   (_refresh [this]
@@ -460,14 +462,13 @@
                   (nil? watching) true
                   :else (reduce-kv (fn [d r _]
                                      (cond
-                                       (instance? Reaction r) (._refresh r)
-                                       (<= age (.-age r)) true
-                                       :else false))
+                                       (instance? Reaction r) (do (._refresh r) d)
+                                       (< age (.-age r)) true
+                                       :else d))
                                    false watching))]
       (if dirty
         (._run this)
-        (set! age generation))
-      false))
+        (set! age generation))))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)

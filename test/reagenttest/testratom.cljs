@@ -56,7 +56,7 @@
     (reset! start 1)
     (r/flush)
     (is (= @out 3))
-    (is (<= 2 @count 3))
+    (is (= 2 @count))
     (dispose const)
     (is (= (running) runs))))
 
