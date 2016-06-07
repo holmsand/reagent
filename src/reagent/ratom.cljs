@@ -346,15 +346,12 @@
 ;;;; reaction
 
 (defprotocol IDisposable
-  (dispose! [this]))
+  (dispose! [this])
+  (add-on-dispose! [this f]))
 
 (defprotocol IRunnable
   (run [this]))
 
-(defprotocol IReaction
-  (add-on-dispose! [this f]))
-
-(def ^:private -empty-array #js[])
 
 (deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable reactions ^:mutable auto-run
@@ -495,13 +492,6 @@
     (._refresh this)
     state)
 
-  IReaction
-  (add-on-dispose! [this f]
-    ;; f is called without arguments when Reaction is no longer active
-    (if-some [a (.-on-dispose-arr this)]
-      (.push a f)
-      (set! (.-on-dispose-arr this) (array f))))
-
   IDisposable
   (dispose! [this]
     (let [s state
@@ -516,7 +506,13 @@
         (.on-dispose this s))
       (when-some [a (.-on-dispose-arr this)]
         (dotimes [i (alength a)]
-          ((aget a i))))))
+          ((aget a i) this)))))
+
+  (add-on-dispose! [this f]
+    ;; f is called with the reaction as argument when it is no longer active
+    (if-some [a (.-on-dispose-arr this)]
+      (.push a f)
+      (set! (.-on-dispose-arr this) (array f))))
 
   IEquiv
   (-equiv [o other] (identical? o other))
