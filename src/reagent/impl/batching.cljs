@@ -76,7 +76,7 @@
   (run-queues [this]
     (set! running true)
     (set! scheduled? false)
-    (let [start (.now js/Date)
+    (let [start (system-time)
           _ (try
               (.flush-queues this)
               (set! running false)
@@ -84,14 +84,13 @@
                 (when running
                   (set! running false)
                   (set! scheduled? false))))
-          end (.now js/Date)]
+          rendtime (- (system-time) start)]
       (when scheduled?
-        (let [rendtime (- end start)]
-          (if (<= (- end start) 16)
-            (next-tick #(.run-queues this))
-            ;; Skip frame to let browser catch up
-            (js/setTimeout (fn [] (next-tick #(.run-queues this)))
-                           16))))))
+        (if (< rendtime 16)
+          (next-tick #(.run-queues this))
+          ;; Skip frame to let browser catch up
+          (js/setTimeout (fn [] (next-tick #(.run-queues this)))
+                         16)))))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
@@ -127,5 +126,5 @@
   (.add-after-render render-queue f))
 
 (defn schedule []
-  (when (false? (.-scheduled? render-queue))
+  (when-not ^boolean (.-scheduled? render-queue)
     (.schedule render-queue)))

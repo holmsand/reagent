@@ -267,12 +267,31 @@
 (deftest non-reactive-deref
   (let [runs (running)
         a (rv/atom 0)
-        b (rv/make-reaction #(+ 5 @a))]
+        spy (atom 0)
+        b (rv/make-reaction (fn []
+                              (swap! spy inc)
+                              (+ 5 @a)))]
     (is (= @b 5))
+    (is (= @spy 1))
     (is (= runs (running)))
 
     (reset! a 1)
     (is (= @b 6))
+    (is (= @spy 2))
+
+    (is (= @b 6))
+    (is (= @spy 2))
+
+    (reset! a 1)
+    (is (= @b 6))
+    (is (= @spy 2))
+
+    (reset! a 2)
+    (is (= @b 7))
+    (is (= @spy 3))
+    (is (= @b 7))
+    (is (= @spy 3))
+
     (is (= runs (running)))))
 
 (deftest catching
