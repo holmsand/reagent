@@ -361,9 +361,9 @@
 
 (def recursion-error "Recursion in Reaction not allowed")
 
-(deftype Reaction [f ^:mutable state ^boolean nocache?
-                   ^:mutable watching ^:mutable reactions ^:mutable auto-run
-                   ^:mutable caught ^:mutable ^number age]
+(deftype Reaction [f ^:mutable state ^boolean nocache? ^:mutable watching
+                   ^:mutable reactions ^:mutable auto-run ^:mutable caught
+                   ^:mutable ^number age ^:mutable ^boolean running]
   IAtom
   IReactiveAtom
 
@@ -404,7 +404,7 @@
 
   (_handle-change [this]
     (when-not (nil? watching)
-      (when-not (.-running this)
+      (when-not running
         (set! age -1)
         (case auto-run
           (nil true) (._run-reactive this)
@@ -503,7 +503,7 @@
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
-    (when (.-running this)
+    (when running
       (throw (js/Error. recursion-error)))
     (if (._refresh this)
       (._run this))
@@ -542,7 +542,7 @@
 
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
-  (let [reaction (Reaction. f nil false nil nil nil nil -1)]
+  (let [reaction (Reaction. f nil false nil nil nil nil -1 false)]
     (._set-opts reaction {:auto-run auto-run
                           :on-set on-set
                           :on-dispose on-dispose})
