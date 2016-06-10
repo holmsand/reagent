@@ -470,11 +470,9 @@
                   (== age generation) false
                   (nil? watching) true
                   :else (reduce-kv (fn [d r _]
-                                     (if (if (instance? Reaction r)
-                                           (._refresh r)
-                                           (< age (.-age r)))
-                                       true
-                                       d))
+                                     (or d (if (instance? Reaction r)
+                                             (._refresh r)
+                                             (< age (.-age r)))))
                                    false watching))]
       (if dirty
         (set! age -1)
