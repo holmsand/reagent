@@ -134,17 +134,17 @@
              
       (reset! a 2)
       (is (= @res (+ 10 @a)))
-      (is (<= 2 @b-changed 3))
+      (is (= @b-changed 2))
       (is (= @c-changed 1))
              
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (<= 2 @b-changed 3))
+      (is (= @b-changed 2))
       (is (= @c-changed 2))
              
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (<= 2 @b-changed 3))
+      (is (= @b-changed 2))
       (is (= @c-changed 2))
              
       (reset! a -1)
