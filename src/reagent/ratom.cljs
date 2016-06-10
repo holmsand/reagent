@@ -23,12 +23,19 @@
 
 (declare ^:dynamic -captured)
 
+(defn- with-running [r f]
+  (set! (.-running r) true)
+  (try
+    (f)
+    (finally
+      (set! (.-running r) false))))
+
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured {}]
     (let [res (if check
                 (._try-exec obj f)
-                (f))]
+                (with-running obj f))]
       (if update
         (let [c -captured]
           (._handle-result obj res c))
@@ -396,9 +403,11 @@
 
   (_handle-change [this]
     (when-not (nil? watching)
-      (case auto-run
-        (nil true) (._run-reactive this)
-        (auto-run this))))
+      (when-not (.-running this)
+        (set! age -1)
+        (case auto-run
+          (nil true) (._run-reactive this)
+          (auto-run this)))))
 
   (_update-watching [this derefed]
     (let [new (set (keys derefed))
@@ -412,7 +421,7 @@
   (_try-exec [this f]
     (try
       (set! caught nil)
-      (f)
+      (with-running this f)
       (catch :default e
         (error "Error in Reaction: " e)
         (set! state e)
@@ -434,6 +443,7 @@
     (let [oldstate state]
       (when-not nocache?
         (set! state res))
+      (set! age generation)
       (when (and (some? derefed)
                  (not= derefed watching))
         (._update-watching this derefed))
@@ -442,30 +452,30 @@
     res)
 
   (_run-reactive [this]
-    (set! age generation)
     (deref-capture f this (and (nil? auto-run)
                                (some? watching))))
 
   (_run [this]
     (if (and (nil? *ratom-context*)
              (nil? auto-run))
-      (do (set! age generation)
-          (._handle-result this (f) nil))
+      (._handle-result this (with-running this f))
       (._run-reactive this)))
 
   (_refresh [this]
     (let [dirty (cond
+                  (neg? age) true
                   (== age generation) false
                   (nil? watching) true
                   :else (reduce-kv (fn [d r _]
-                                     (cond
-                                       (instance? Reaction r) (do (._refresh r) d)
-                                       (< age (.-age r)) true
-                                       :else d))
+                                     (if (if (instance? Reaction r)
+                                           (._refresh r)
+                                           (< age (.-age r)))
+                                       (reduced true)
+                                       d))
                                    false watching))]
-      (if dirty
-        (._run this)
-        (set! age generation))))
+      (when-not dirty
+        (set! age generation))
+      dirty))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)
@@ -489,7 +499,11 @@
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
-    (._refresh this)
+    (when (.-running this)
+      (when-not (> age generation)
+        (error "refreshing " (str [age generation]))))
+    (if (._refresh this)
+      (._run this))
     state)
 
   IDisposable

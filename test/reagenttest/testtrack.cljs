@@ -294,3 +294,28 @@
     (r/dispose! run)
     (is (= 0 (count @ts)))
     (is (= runs (running)))))
+
+(deftest multi-depend
+  (let [runs (running)
+        a (r/atom {:foo 1})
+        f1 (fn [] @a)
+        f2 (fn [] (:foo @a))
+        f3 (fn [] [(f1) (f2)])
+        count (atom 0)
+        spy (atom nil)
+        res (r/track! (fn []
+                        (swap! count inc)
+                        (reset! spy [@(track f1) @(track f2)])))]
+    (is (= @spy (f3)))
+    (is (= @res (f3)))
+    (is (= @count 1))
+
+    (swap! a assoc :foo 2)
+    (sync)
+    (is (= @count 2))
+    (is (= @spy (f3)))
+    (is (= @res (f3)))
+
+    (swap! a assoc :foo 3)
+    (is (= @res (f3)))
+    (is (= @count 3))))
