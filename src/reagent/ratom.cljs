@@ -473,10 +473,11 @@
                                      (if (if (instance? Reaction r)
                                            (._refresh r)
                                            (< age (.-age r)))
-                                       (reduced true)
+                                       true
                                        d))
                                    false watching))]
-      (when-not dirty
+      (if dirty
+        (set! age -1)
         (set! age generation))
       dirty))
 
