@@ -371,10 +371,10 @@
   (-add-reaction [this r]
     (add-r this r))
   (-remove-reaction [this r]
-    (let [was-empty (empty? reactions)]
+    (let [was-empty (zero? (count reactions))]
       (remove-r this r)
       (when (and (not was-empty)
-                 (empty? reactions)
+                 (zero? (count reactions))
                  (nil? auto-run))
         (dispose! this))))
 
@@ -447,8 +447,7 @@
       (when-not nocache?
         (set! state res))
       (set! age generation)
-      (when (and (some? derefed)
-                 (not= derefed watching))
+      (when (not= derefed watching)
         (._update-watching this derefed))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
@@ -469,7 +468,7 @@
                   (neg? age) true
                   (== age generation) false
                   (nil? watching) true
-                  :else (reduce-kv (fn [d r _]
+                  :else (reduce-kv (fn [^boolean d r _]
                                      (or d (if (instance? Reaction r)
                                              (._refresh r)
                                              (< age (.-age r)))))
@@ -501,9 +500,9 @@
       (throw e))
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
-    (when running
-      (throw (js/Error. recursion-error)))
-    (if (._refresh this)
+    (when (._refresh this)
+      (when running
+        (throw (js/Error. recursion-error)))
       (._run this))
     state)
 
@@ -563,7 +562,7 @@
 
 (defn check-derefs [f]
   (let [[res captured] (in-context #js{} f false false)]
-    [res (not (empty? captured))]))
+    [res (pos? (count captured))]))
 
 
 ;;; wrap
