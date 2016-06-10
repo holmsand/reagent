@@ -476,3 +476,36 @@
     (is (= @r @foo))
     (dispose r)
     (is (= runs (running)))))
+
+(deftest recursion-fail
+  (let [runs (running)
+        state (r/atom 1)
+        tracks (r/atom {:a state
+                        :b (r/atom 2)})
+        val (fn [a] @(get @tracks a))
+        plus (fn [a b]
+               (if (> (val a) 0)
+                 (+ (val a)
+                    (val b))
+                 (val a)))
+        _ (swap! tracks assoc :c (r/track plus :a :b))
+        t (r/track! (fn []
+                      (val :c)))]
+    (is (= @t 3))
+    (swap! tracks assoc :b (r/track plus :a :b))
+    (is (thrown-with-msg? :default #"Recursion in Reactio"
+                          (r/flush)))
+    (reset! state -1)
+    (is (nil? (r/flush)))
+    (is (= @t -1))
+    (reset! state 4)
+    (is (thrown-with-msg? :default #"Recursion in Reaction"
+                          (r/flush)))
+    (reset! state 12)
+    (is (thrown-with-msg? :default #"Recursion in Reaction not"
+                          (r/flush)))
+    (reset! state -11)
+    (is (nil? (r/flush)))
+    (is (= @t -11))
+    (dispose t)
+    (is (= runs (running)))))

@@ -359,6 +359,7 @@
 (defprotocol IRunnable
   (run [this]))
 
+(def recursion-error "Recursion in Reaction not allowed")
 
 (deftype Reaction [f ^:mutable state ^boolean nocache?
                    ^:mutable watching ^:mutable reactions ^:mutable auto-run
@@ -423,6 +424,8 @@
       (set! caught nil)
       (with-running this f)
       (catch :default e
+        (when (identical? (.-message e) recursion-error)
+          (throw e))
         (error "Error in Reaction: " e)
         (set! state e)
         (set! caught e)
@@ -500,8 +503,7 @@
     (when-not (nil? *ratom-context*)
       (notify-deref-watcher! this))
     (when (.-running this)
-      (when-not (> age generation)
-        (error "refreshing " (str [age generation]))))
+      (throw (js/Error. recursion-error)))
     (if (._refresh this)
       (._run this))
     state)
