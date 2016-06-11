@@ -9,6 +9,7 @@
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
 (defonce ^:private generation 1)
+(defonce ^:private atom-generation 1)
 (defonce ^:private with-let-gen 1)
 (defonce ^:private -running (clojure.core/atom 0))
 
@@ -134,7 +135,7 @@
 
   Object
   (_enqueue [a old]
-    (set! age (set! generation (inc generation)))
+    (set! age (set! atom-generation (set! generation (inc generation))))
     (when (and (identical? oldstate -no-value)
                (pos? (count (.-reactions a))))
       (when (nil? ratom-queue)
@@ -466,7 +467,7 @@
   (_refresh [this]
     (let [dirty (cond
                   (neg? age) true
-                  (== age generation) false
+                  (>= age atom-generation) false
                   (nil? watching) true
                   :else (reduce-kv (fn [^boolean d r _]
                                      (or d (if (instance? Reaction r)
