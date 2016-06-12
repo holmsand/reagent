@@ -67,8 +67,7 @@
   new)
 
 (defn- add-r [this r]
-  (let [w (.-reactions this)
-        w (if (nil? w) #{} w)]
+  (let [w (or (.-reactions this) #{})]
     (set! (.-reactions this) (check-watches w (conj w r)))
     (set! (.-reactionsArr this) nil)))
 
@@ -78,11 +77,11 @@
     (set! (.-reactionsArr this) nil)))
 
 (defn- notify-r [this]
-  (let [w (.-reactionsArr this)
-        a (if (nil? w)
+  (let [a (.-reactionsArr this)
+        a (if (nil? a)
             ;; Copy watches to array for speed
             (set! (.-reactionsArr this) (into-array (.-reactions this)))
-            w)]
+            a)]
     (dotimes [i (alength a)]
       (let [r (aget a i)]
         (when (>= (.-age this) (.-age r))
@@ -137,7 +136,7 @@
   (_enqueue [a old]
     (set! age (set! atom-generation (set! generation (inc generation))))
     (when (and (identical? oldstate -no-value)
-               (pos? (count (.-reactions a))))
+               (-> a .-reactions count pos?))
       (when (nil? ratom-queue)
         (set! ratom-queue (array))
         (batch/schedule))
@@ -372,10 +371,10 @@
   (-add-reaction [this r]
     (add-r this r))
   (-remove-reaction [this r]
-    (let [was-empty (zero? (count reactions))]
+    (let [was-empty (-> reactions count zero?)]
       (remove-r this r)
       (when (and (not was-empty)
-                 (zero? (count reactions))
+                 (-> reactions count zero?)
                  (nil? auto-run))
         (dispose! this))))
 
@@ -412,8 +411,8 @@
           (auto-run this)))))
 
   (_update-watching [this derefed]
-    (let [new (set (keys derefed))
-          old (set (keys watching))]
+    (let [new (-> derefed keys set)
+          old (-> watching keys set)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
         (-add-reaction w this))
@@ -433,8 +432,8 @@
         (set! age -1))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (pos? (count (.-watches this)))
-          has-r (pos? (count reactions))]
+    (let [has-w (-> this .-watches count pos?)
+          has-r (-> reactions count pos?)]
       (when (or has-w has-r)
         (when (not= oldstate newstate)
           (set! age (set! generation (inc generation)))
@@ -563,7 +562,7 @@
 
 (defn check-derefs [f]
   (let [[res captured] (in-context #js{} f false false)]
-    [res (pos? (count captured))]))
+    [res (-> captured count pos?)]))
 
 
 ;;; wrap
