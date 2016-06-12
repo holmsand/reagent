@@ -14,8 +14,8 @@
              from a tag name."}
   re-tag #"([^\s\.#]+)(?:#([^\s\.#]+))?(?:\.([^\s#]+))?")
 
-(deftype NativeWrapper [])
-
+(deftype NativeWrapper [comp id className])
+(deftype ParsedTag [comp id className])
 
 ;;; Common utilities
 
@@ -77,23 +77,23 @@
 (defn oget [o k]
   (if (nil? o) nil (aget o k)))
 
-(defn set-id-class [p id-class]
-  (let [id ($ id-class :id)
+(defn set-id-class [p parsed]
+  (let [id (.-id parsed)
         p (if (and (some? id)
                    (nil? (oget p "id")))
             (oset p "id" id)
             p)]
-    (if-some [class ($ id-class :className)]
+    (if-some [class (.-className parsed)]
       (let [old (oget p "className")]
         (oset p "className" (if (nil? old)
                               class
                               (str class " " old))))
       p)))
 
-(defn convert-props [props id-class]
+(defn convert-props [props parsed]
   (-> props
       convert-prop-value
-      (set-id-class id-class)))
+      (set-id-class parsed)))
 
 
 ;;; Specialization for input components
@@ -215,9 +215,7 @@
                 (string/replace class #"\." " "))]
     (assert tag (str "Invalid tag: '" hiccup-tag "'"
                      (comp/comp-name)))
-    #js{:name tag
-        :id id
-        :className class}))
+    (->ParsedTag tag id class)))
 
 (defn try-get-key [x]
   ;; try catch to avoid clojurescript peculiarity with
@@ -242,10 +240,7 @@
     ($ util/react createElement c jsprops)))
 
 (defn adapt-react-class [c]
-  (doto (NativeWrapper.)
-    ($! :name c)
-    ($! :id nil)
-    ($! :class nil)))
+  (NativeWrapper. c nil nil))
 
 (def tag-name-cache #js{})
 
@@ -257,7 +252,7 @@
 (declare as-element)
 
 (defn native-element [parsed argv first]
-  (let [comp ($ parsed :name)]
+  (let [comp (.-comp parsed)]
     (let [props (nth argv first nil)
           hasprops (or (nil? props) (map? props))
           jsprops (convert-props (if hasprops props) parsed)
@@ -299,7 +294,7 @@
               (assert (= ">" n) (hiccup-err v "Invalid Hiccup tag"))
               (assert (or (string? comp) (fn? comp))
                       (hiccup-err v "Expected React component in"))
-              (native-element #js{:name comp} v 2))
+              (native-element (->NativeWrapper comp nil nil) v 2))
           ;; Support extended hiccup syntax, i.e :div.bar>a.foo
           (recur [(subs n 0 pos)
                   (assoc v 0 (subs n (inc pos)))])))
