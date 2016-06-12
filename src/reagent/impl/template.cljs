@@ -61,25 +61,34 @@
     (aset (cached-prop-name k)
           (convert-prop-value v))))
 
+(defn coll-conv [v]
+  (let [a (into-array v)]
+    (dotimes [i (alength a)]
+      (aset a i (convert-prop-value (aget a i))))
+    a))
+
 (defn convert-prop-value [x]
   (cond (js-val? x) x
         (named? x) (name x)
         (map? x) (reduce-kv kv-conv #js{} x)
-        (coll? x) (clj->js x)
+        (coll? x) (coll-conv x)
         (ifn? x) (fn [& args]
                    (apply x args))
         :else (clj->js x)))
 
 (defn set-id-class [p parsed]
-  (let [p (if (nil? p) #js{} p)]
+  (let [p (if (nil? p) #js{} p)
+        c ($ p :className)
+        oldclass (if (array? c)
+                   ($! p :className (.join c " "))
+                   c)]
     (when-some [id (.-id parsed)]
       (when (nil? ($ p :id))
         ($! p :id id)))
     (when-some [class (.-className parsed)]
-      (let [old ($ p :className)]
-        ($! p :className (if (nil? old)
-                           class
-                           (str class " " old)))))
+      ($! p :className (if (nil? oldclass)
+                         class
+                         (str class " " oldclass))))
     p))
 
 (defn convert-props [props parsed]
