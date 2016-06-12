@@ -200,7 +200,7 @@
       (some? r) (-deref r)
       (nil? *ratom-context*) (f)
       :else (let [r (make-reaction
-                     f :on-dispose (fn [x]
+                     f :on-dispose (fn [r s]
                                      (when debug (set! -nwatches (dec -nwatches)))
                                      (as-> (aget o cache-key) _
                                        (dissoc _ k)
@@ -208,7 +208,7 @@
                                      (when (some? obj)
                                        (set! (.-reaction obj) nil))
                                      (when (some? destroy)
-                                       (destroy x))))
+                                       (destroy s))))
                   v (-deref r)]
               (aset o cache-key (assoc m k r))
               (when debug (set! -nwatches (inc -nwatches)))
@@ -355,7 +355,8 @@
 
 (deftype Reaction [f ^:mutable state ^boolean nocache? ^:mutable watching
                    ^:mutable reactions ^:mutable auto-run ^:mutable caught
-                   ^:mutable ^number age ^:mutable ^boolean running]
+                   ^:mutable ^number age ^:mutable ^boolean running
+                   ^:mutable on-dispose]
   IAtom
   IReactiveAtom
 
@@ -480,10 +481,10 @@
       (set! (.-auto-run this) auto-run))
     (when (some? on-set)
       (set! (.-on-set this) on-set))
-    (when (some? on-dispose)
-      (set! (.-on-dispose this) on-dispose))
     (when (some? no-cache)
-      (set! (.-nocache? this) no-cache)))
+      (set! (.-nocache? this) no-cache))
+    (when (some? on-dispose)
+      (add-on-dispose! this on-dispose)))
 
   IRunnable
   (run [this]
@@ -513,17 +514,15 @@
       (set! age -1)
       (doseq [w wg]
         (-remove-reaction w this))
-      (when (some? (.-on-dispose this))
-        (.on-dispose this s))
-      (when-some [a (.-on-dispose-arr this)]
+      (when-some [a on-dispose]
         (dotimes [i (alength a)]
-          ((aget a i) this)))))
+          ((aget a i) this s)))))
 
   (add-on-dispose! [this f]
     ;; f is called with the reaction as argument when it is no longer active
-    (if-some [a (.-on-dispose-arr this)]
-      (.push a f)
-      (set! (.-on-dispose-arr this) (array f))))
+    (if (nil? on-dispose)
+      (set! on-dispose (array f))
+      (.push on-dispose f)))
 
   IEquiv
   (-equiv [o other] (identical? o other))
@@ -536,28 +535,32 @@
 
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
-  (let [reaction (Reaction. f nil false nil nil nil nil -1 false)]
-    (._set-opts reaction {:auto-run auto-run
-                          :on-set on-set
-                          :on-dispose on-dispose})
+  {:pre [(ifn? f)
+         (or (nil? on-set) (fn? on-set))
+         (or (nil? auto-run) (true? auto-run) (fn? auto-run))
+         (or (nil? on-dispose) (fn? on-dispose))]}
+  (let [od (and on-dispose (array on-dispose))
+        reaction (->Reaction f nil false nil nil auto-run nil -1 false od)]
+    (if on-set
+      (._set-opts reaction {:on-set on-set}))
     reaction))
 
 
 
-(def ^:private temp-reaction (make-reaction nil))
+(def ^:private temp-reaction (make-reaction (fn [])))
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (deref-capture f r false)]
     (when-not (nil? (.-watching r))
-      (set! temp-reaction (make-reaction nil))
+      (set! temp-reaction (make-reaction (fn [])))
       (._set-opts r opts)
       (set! (.-f r) f)
       (set! (.-auto-run r) #(run obj))
       (aset obj key r))
     res))
 
-(def ^:private check-reaction (make-reaction nil))
+(def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
   (let [[res captured] (in-context check-reaction f false false)]
