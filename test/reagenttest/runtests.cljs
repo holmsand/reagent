@@ -34,7 +34,7 @@
 (defn run-tests []
   (reset! test-results nil)
   (if r/is-client
-    (js/setTimeout all-tests 100)
+    (js/setTimeout all-tests 50)
     (all-tests)))
 
 (defn test-output-mini []

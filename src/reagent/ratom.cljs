@@ -11,7 +11,7 @@
 (defonce ^:private generation 1)
 (defonce ^:private atom-generation 1)
 (defonce ^:private with-let-gen 1)
-(defonce ^:private -running (clojure.core/atom 0))
+(defonce ^:private -nwatches 0)
 
 (defn ^boolean reactive? []
   (some? *ratom-context*))
@@ -19,24 +19,16 @@
 
 ;;; Utilities
 
-(defn running []
-  (+ @-running))
+(defn running [] -nwatches)
 
 (declare ^:dynamic -captured)
-
-(defn- with-running [r f]
-  (set! (.-running r) true)
-  (try
-    (f)
-    (finally
-      (set! (.-running r) false))))
 
 (defn- in-context [obj f ^boolean update ^boolean check]
   (binding [*ratom-context* obj
             -captured {}]
     (let [res (if check
                 (._try-exec obj f)
-                (with-running obj f))]
+                (._unchecked-exec obj f))]
       (if update
         (let [c -captured]
           (._handle-result obj res c))
@@ -63,7 +55,7 @@
 
 (defn- check-watches [old new]
   (when debug
-    (swap! -running + (- (count new) (count old))))
+    (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
 (defn- add-r [this r]
@@ -209,7 +201,7 @@
       (nil? *ratom-context*) (f)
       :else (let [r (make-reaction
                      f :on-dispose (fn [x]
-                                     (when debug (swap! -running dec))
+                                     (when debug (set! -nwatches (dec -nwatches)))
                                      (as-> (aget o cache-key) _
                                        (dissoc _ k)
                                        (aset o cache-key _))
@@ -219,7 +211,7 @@
                                        (destroy x))))
                   v (-deref r)]
               (aset o cache-key (assoc m k r))
-              (when debug (swap! -running inc))
+              (when debug (set! -nwatches (inc -nwatches)))
               (when (some? obj)
                 (set! (.-reaction obj) r))
               v))))
@@ -368,15 +360,14 @@
   IReactiveAtom
 
   IReactionWatchable
-  (-add-reaction [this r]
-    (add-r this r))
   (-remove-reaction [this r]
     (let [was-empty (-> reactions count zero?)]
       (remove-r this r)
-      (when (and (not was-empty)
-                 (-> reactions count zero?)
-                 (nil? auto-run))
+      (when (and (nil? auto-run)
+                 (not was-empty)
+                 (-> reactions count zero?))
         (dispose! this))))
+  (-add-reaction [this r]         (add-r this r))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
@@ -419,17 +410,23 @@
       (doseq [w (s/difference old new)]
         (-remove-reaction w this))))
 
+  (_unchecked-exec [r f]
+    (set! running true)
+    (try (f)
+         (finally (set! running false))))
+
   (_try-exec [this f]
-    (try
-      (set! caught nil)
-      (with-running this f)
-      (catch :default e
-        (when (identical? (.-message e) recursion-error)
-          (throw e))
-        (error "Error in Reaction: " e)
-        (set! state e)
-        (set! caught e)
-        (set! age -1))))
+    (set! running true)
+    (set! caught nil)
+    (try (f)
+         (catch :default e
+           (when (= recursion-error (.-message e))
+             (throw e))
+           (error "Error in Reaction: " e)
+           (set! state e)
+           (set! caught e)
+           (set! age -1))
+         (finally (set! running false))))
 
   (_maybe-notify [this oldstate newstate]
     (let [has-w (-> this .-watches count pos?)
@@ -460,7 +457,7 @@
   (_run [this]
     (if (and (nil? *ratom-context*)
              (nil? auto-run))
-      (._handle-result this (with-running this f))
+      (._handle-result this (._unchecked-exec this f))
       (._run-reactive this)))
 
   (_refresh [this]
@@ -560,8 +557,10 @@
       (aset obj key r))
     res))
 
+(def ^:private check-reaction (make-reaction nil))
+
 (defn check-derefs [f]
-  (let [[res captured] (in-context #js{} f false false)]
+  (let [[res captured] (in-context check-reaction f false false)]
     [res (-> captured count pos?)]))
 
 
