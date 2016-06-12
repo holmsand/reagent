@@ -70,25 +70,17 @@
                    (apply x args))
         :else (clj->js x)))
 
-(defn oset [o k v]
-  (doto (if (nil? o) #js{} o)
-    (aset k v)))
-
-(defn oget [o k]
-  (if (nil? o) nil (aget o k)))
-
 (defn set-id-class [p parsed]
-  (let [id (.-id parsed)
-        p (if (and (some? id)
-                   (nil? (oget p "id")))
-            (oset p "id" id)
-            p)]
-    (if-some [class (.-className parsed)]
-      (let [old (oget p "className")]
-        (oset p "className" (if (nil? old)
-                              class
-                              (str class " " old))))
-      p)))
+  (let [p (if (nil? p) #js{} p)]
+    (when-some [id (.-id parsed)]
+      (when (nil? ($ p :id))
+        ($! p :id id)))
+    (when-some [class (.-className parsed)]
+      (let [old ($ p :className)]
+        ($! p :className (if (nil? old)
+                           class
+                           (str class " " old)))))
+    p))
 
 (defn convert-props [props parsed]
   (-> props
@@ -264,7 +256,7 @@
         (let [key (-> (meta argv) get-key)
               p (if (nil? key)
                   jsprops
-                  (oset jsprops "key" key))]
+                  (doto jsprops ($! :key key)))]
           (make-element argv comp p first-child))))))
 
 (defn str-coll [coll]
