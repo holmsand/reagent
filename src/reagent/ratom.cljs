@@ -395,12 +395,11 @@
       (-deref this)))
 
   (_handle-change [this]
-    (when-not (nil? watching)
-      (when-not running
-        (set! age -1)
-        (case auto-run
-          (nil true) (._run-reactive this)
-          (auto-run this)))))
+    (when-not (or running (nil? watching))
+      (set! age -1)
+      (case auto-run
+        (nil true) (._run-reactive this)
+        (auto-run this))))
 
   (_update-watching [this derefed]
     (let [new (-> derefed keys set)
@@ -413,6 +412,7 @@
 
   (_unchecked-exec [r f]
     (set! running true)
+    (set! caught nil)
     (try (f)
          (finally (set! running false))))
 
@@ -493,14 +493,10 @@
   IDeref
   (-deref [this]
     (when-some [e caught]
-      (set! caught nil)
-      (set! age -1)
       (throw e))
-    (when-not (nil? *ratom-context*)
-      (notify-deref-watcher! this))
+    (notify-deref-watcher! this)
     (when (._refresh this)
-      (when running
-        (throw (js/Error. recursion-error)))
+      (when running (throw (js/Error. recursion-error)))
       (._run this))
     state)
 
