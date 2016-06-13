@@ -23,21 +23,17 @@
 
 (declare ^:dynamic -captured)
 
-(defn- in-context [obj f ^boolean update ^boolean check]
-  (binding [*ratom-context* obj
-            -captured {}]
-    (let [res (if check
-                (._try-exec obj f)
-                (._unchecked-exec obj f))]
-      (if update
-        (let [c -captured]
-          (._handle-result obj res c))
-        [res -captured]))))
-
-(defn- deref-capture [f r ^boolean check]
+(defn- deref-capture [r f ^boolean update ^boolean check]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
-  (in-context r f true check))
+  (binding [*ratom-context* r
+            -captured {}]
+    (let [res (if check
+                (._try-exec r f)
+                (._unchecked-exec r f))]
+      (if update
+        (._handle-result r res -captured)
+        [res -captured]))))
 
 (defn- notify-deref-watcher! [derefed]
   (when-some [r *ratom-context*]
@@ -190,12 +186,11 @@
 
 (declare make-reaction)
 
-(def ^{:private true :const true} cache-key "reagReactionCache")
+(def ^:private cache-key "reagReactionCache")
 
 (defn- cached-reaction [f o k obj destroy]
   (let [m (aget o cache-key)
-        m (if (nil? m) {} m)
-        r (m k nil)]
+        r (get m k)]
     (cond
       (some? r) (-deref r)
       (nil? *ratom-context*) (f)
@@ -449,8 +444,7 @@
     res)
 
   (_run-reactive [this]
-    (deref-capture f this (and (nil? auto-run)
-                               (some? watching))))
+    (deref-capture this f true (nil? auto-run)))
 
   (_run [this]
     (if (and (nil? *ratom-context*)
@@ -468,9 +462,7 @@
                                              (._refresh r)
                                              (< age (.-age r)))))
                                    false watching))]
-      (if dirty
-        (set! age -1)
-        (set! age generation))
+      (set! age (if dirty -1 generation))
       dirty))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -499,14 +491,13 @@
 
   IDisposable
   (dispose! [this]
-    (let [s state
-          wg (keys watching)]
+    (let [s state]
+      (doseq [w (keys watching)]
+        (-remove-reaction w this))
       (set! watching nil)
       (set! state nil)
       (set! auto-run nil)
       (set! age -1)
-      (doseq [w wg]
-        (-remove-reaction w this))
       (when-some [a on-dispose]
         (dotimes [i (alength a)]
           ((aget a i) this s)))))
@@ -544,7 +535,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture f r false)]
+        res (deref-capture r f true false)]
     (when-not (nil? (.-watching r))
       (set! temp-reaction (make-reaction (fn [])))
       (._set-opts r opts)
@@ -556,7 +547,7 @@
 (def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
-  (let [[res captured] (in-context check-reaction f false false)]
+  (let [[res captured] (deref-capture check-reaction f false false)]
     [res (-> captured count pos?)]))
 
 
