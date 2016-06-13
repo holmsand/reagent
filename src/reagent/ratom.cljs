@@ -457,11 +457,11 @@
                   (neg? age) true
                   (>= age atom-generation) false
                   (nil? watching) true
-                  :else (reduce-kv (fn [^boolean d r _]
-                                     (or d (if (instance? Reaction r)
-                                             (._refresh r)
-                                             (< age (.-age r)))))
-                                   false watching))]
+                  :else ^boolean (reduce-kv (fn [^boolean d r _]
+                                              (or d (if (instance? Reaction r)
+                                                      (._refresh r)
+                                                      (< age (.-age r)))))
+                                            false watching))]
       (set! age (if dirty -1 generation))
       dirty))
 
@@ -484,7 +484,7 @@
     (when-some [e caught]
       (throw e))
     (notify-deref-watcher! this)
-    (when (._refresh this)
+    (when ^boolean (._refresh this)
       (when running (throw (js/Error. recursion-error)))
       (._run this))
     state)
