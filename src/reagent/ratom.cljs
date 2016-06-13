@@ -50,8 +50,9 @@
   (set! (.-watches this) (dissoc (.-watches this) key)))
 
 (defn- notify-w [this old new]
-  (doseq [[key f] (.-watches this)]
-    (f key this old new)))
+  (when-some [ws (.-watches this)]
+    (doseq [[key f] ws]
+      (f key this old new))))
 
 (defn- check-watches [old new]
   (when debug
@@ -149,8 +150,7 @@
       (set! state new-value)
       (when-not (identical? old-value new-value)
         (._enqueue a old-value))
-      (when-not (nil? watches)
-        (notify-w a old-value new-value))
+      (notify-w a old-value new-value)
       new-value))
 
   ISwap
@@ -276,8 +276,7 @@
   (_set-state [this oldstate newstate]
     (when-not (identical? oldstate newstate)
       (set! state newstate)
-      (when (some? watches)
-        (notify-w this oldstate newstate))))
+      (notify-w this oldstate newstate)))
 
   IDeref
   (-deref [this]
@@ -432,13 +431,11 @@
   (_maybe-notify [this oldstate newstate]
     (let [has-w (-> this .-watches count pos?)
           has-r (-> reactions count pos?)]
-      (when (or has-w has-r)
-        (when (not= oldstate newstate)
-          (set! age (set! generation (inc generation)))
-          (when has-w
-            (notify-w this oldstate newstate))
-          (when has-r
-            (notify-r this))))))
+      (when (and (or has-w has-r)
+                 (not= oldstate newstate))
+        (set! age (set! generation (inc generation)))
+        (when has-w (notify-w this oldstate newstate))
+        (when has-r (notify-r this)))))
 
   (_handle-result [this res derefed]
     (let [oldstate state]
@@ -583,8 +580,7 @@
     (let [oldval state]
       (set! changed true)
       (set! state newval)
-      (when (some? watches)
-        (notify-w this oldval newval))
+      (notify-w this oldval newval)
       (callback newval)
       newval))
 
