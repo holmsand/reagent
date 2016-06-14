@@ -36,7 +36,7 @@
         [res -captured]))))
 
 (defn- notify-deref-watcher! [derefed]
-  (when-some [r *ratom-context*]
+  (when-not (nil? *ratom-context*)
     (set! -captured (assoc -captured derefed nil))))
 
 (defn- add-w [this key f]
@@ -190,7 +190,7 @@
 
 (defn- cached-reaction [f o k obj destroy]
   (let [m (aget o cache-key)
-        r (get m k)]
+        r (get m k nil)]
     (cond
       (some? r) (-deref r)
       (nil? *ratom-context*) (f)
@@ -503,7 +503,8 @@
           ((aget a i) this s)))))
 
   (add-on-dispose! [this f]
-    ;; f is called with the reaction as argument when it is no longer active
+    ;; f is called with the reaction and last state as arguments when
+    ;; it is no longer active
     (if (nil? on-dispose)
       (set! on-dispose (array f))
       (.push on-dispose f)))
