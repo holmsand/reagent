@@ -104,9 +104,6 @@
 
 (defprotocol IReactiveAtom)
 
-(defprotocol IReactionWatchable
-  (-add-reaction [this r])
-  (-remove-reaction [this r]))
 
 (deftype RAtom [^:mutable state meta validator ^:mutable watches
                 ^:mutable oldstate ^:mutable ^number age]
@@ -122,6 +119,13 @@
     state)
 
   Object
+  (_add-reaction [this r]
+    (when-not (identical? oldstate -no-value)
+      (set! oldstate -unique-value))
+    (add-r this r))
+
+  (_remove-reaction [this r] (remove-r this r))
+
   (_enqueue [a old]
     (set! age (set! atom-generation (set! generation (inc generation))))
     (when (identical? oldstate -no-value)
@@ -168,13 +172,6 @@
 
   IPrintWithWriter
   (-pr-writer [a w opts] (pr-atom a w opts "Atom:"))
-
-  IReactionWatchable
-  (-add-reaction [this r]
-    (when-not (identical? oldstate -no-value)
-      (set! oldstate -unique-value))
-    (add-r this r))
-  (-remove-reaction [this r]      (remove-r this r))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
@@ -362,16 +359,6 @@
   IAtom
   IReactiveAtom
 
-  IReactionWatchable
-  (-remove-reaction [this r]
-    (let [was-empty (-> reactions count zero?)]
-      (remove-r this r)
-      (when (and (nil? auto-run)
-                 (not was-empty)
-                 (-> reactions count zero?))
-        (dispose! this))))
-  (-add-reaction [this r]         (add-r this r))
-
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
   (-add-watch [this key f]        (add-w this key f))
@@ -396,6 +383,16 @@
     (binding [*ratom-context* nil]
       (-deref this)))
 
+  (_add-reaction [this r] (add-r this r))
+
+  (_remove-reaction [this r]
+    (let [was-empty (-> reactions count zero?)]
+      (remove-r this r)
+      (when (and (nil? auto-run)
+                 (not was-empty)
+                 (-> reactions count zero?))
+        (dispose! this))))
+
   (_handle-change [this]
     (when-not (or running (nil? watching))
       (set! age -1)
@@ -408,9 +405,9 @@
           old (-> watching keys set)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
-        (-add-reaction w this))
+        (._add-reaction w this))
       (doseq [w (s/difference old new)]
-        (-remove-reaction w this))))
+        (._remove-reaction w this))))
 
   (_unchecked-exec [r f]
     (set! running true)
@@ -499,7 +496,7 @@
   (dispose! [this]
     (let [s state]
       (doseq [w (keys watching)]
-        (-remove-reaction w this))
+        (._remove-reaction w this))
       (set! watching nil)
       (set! state nil)
       (set! auto-run nil)
