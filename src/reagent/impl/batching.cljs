@@ -86,11 +86,11 @@
                   (set! scheduled? false))))
           rendtime (- (system-time) start)]
       (when scheduled?
-        (if (< rendtime 16)
+        (if (< rendtime 15)
           (next-tick #(.run-queues this))
-          ;; Reduce framerate to let the browser catch up
+          ;; Reduce framerate to let the browser catch up and handle events
           (js/setTimeout (fn [] (next-tick #(.run-queues this)))
-                         (min rendtime 250))))))
+                         (max 16 (min (* 0.5 rendtime) 200)))))))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
