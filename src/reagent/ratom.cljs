@@ -68,12 +68,21 @@
 (defn- notify-r [this]
   (let [a (.-reactionsArr this)
         a (if (nil? a)
-            ;; Copy watches to array for speed
-            (set! (.-reactionsArr this) (into-array (.-reactions this)))
-            a)]
-    (dotimes [i (alength a)]
+            (let [rs (.-reactions this)
+                  rs (if debug (shuffle rs) rs)]
+              ;; Copy watches to array for speed
+              (set! (.-reactionsArr this) (into-array rs)))
+            a)
+        len (alength a)
+        age (.-age this)]
+    (dotimes [i len]
       (let [r (aget a i)]
-        (when (>= (.-age this) (.-age r))
+        (when (> age (.-age r))
+          ;; Mark as dirty
+          (set! (.-age r) -1))))
+    (dotimes [i len]
+      (let [r (aget a i)]
+        (when (== (.-age r) -1)
           (._handle-change r))))))
 
 (defn- pr-atom [a writer opts s]
@@ -463,7 +472,7 @@
                   (>= age atom-generation) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
-                                              (or d (._refresh r age)))
+                                              (or d ^boolean (._refresh r age)))
                                             false watching))]
       (set! age (if dirty -1 generation))
       dirty))

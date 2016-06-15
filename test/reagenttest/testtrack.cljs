@@ -90,6 +90,11 @@
     (is (= @count 3))
     (is (= (running) runs))))
 
+(deftest repeat-tests
+  (dotimes [_ testite]
+    (basic-ratom)
+    (test-track!)))
+
 (deftest double-dependency
   (let [runs (running)
         start (rv/atom 0)

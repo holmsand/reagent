@@ -60,6 +60,10 @@
     (dispose const)
     (is (= (running) runs))))
 
+(deftest repeat-tests
+  (dotimes [_ testite]
+    (basic-ratom)))
+
 (deftest double-dependency
   (let [runs (running)
         start (rv/atom 0)

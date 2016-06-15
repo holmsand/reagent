@@ -110,6 +110,7 @@
           a1 (reaction (inc @a))
           a2 (reaction @a)
           b-changed (atom 0)
+          b-saved (atom 0)
           c-changed (atom 0)
           b (reaction
              (swap! b-changed inc)
@@ -135,19 +136,20 @@
              
       (reset! a 2)
       (sync)
-      (is (= @b-changed 2))
+      (is (<= 2 @b-changed 3))
+      (reset! b-saved @b-changed)
       (is (= @c-changed 1))
       (is (= @res (+ 10 @a)))
              
       (reset! a 3)
       (sync)
-      (is (= @b-changed 2))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
       (is (= @res (+ 10 @a)))
              
       (reset! a 3)
       (sync)
-      (is (= @b-changed 2))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
       (is (= @res (+ 10 @a)))
              
