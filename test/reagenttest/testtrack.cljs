@@ -335,15 +335,23 @@
     (sync)
     (is (= @count 3))
     (is (= @res (f3)))
-    (is (= @count 4))
+    (is (= @count 3))
 
     (reset! a @a)
     (is (= @spy (f3)))
-    (is (= @count 4))
+    (is (= @count 3))
 
     (reset! a {:foo 3})
     (is (= @res (f3)))
-    (is (= @count 5))
+    (is (= @count 3))
 
     (is (= @res (f3)))
-    (is (= @count 5))))
+    (is (= @count 3))
+
+    (reset! a {:foo 4})
+    (sync)
+    (is (= @spy (f3)))
+    (is (= @count 4))
+
+    (is (= @res (f3)))
+    (is (= @count 4))))

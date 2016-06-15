@@ -124,19 +124,27 @@
   Object
   (_enqueue [a old]
     (set! age (set! atom-generation (set! generation (inc generation))))
-    (when (and (identical? oldstate -no-value)
-               (-> a .-reactions count pos?))
+    (when (identical? oldstate -no-value)
+      (set! oldstate old)
       (when (nil? ratom-queue)
         (set! ratom-queue (array))
         (batch/schedule))
-      (set! oldstate old)
       (.push ratom-queue a)))
 
   (_notify [a]
-    (let [old oldstate]
-      (set! oldstate -no-value)
-      (when (not= old state)
-        (notify-r a))))
+    (try
+      (when (not= oldstate state)
+        (notify-r a))
+      (finally
+        (set! oldstate -no-value))))
+
+  (_refresh [a compare]
+    (cond
+      (>= compare age) false
+      (identical? oldstate -no-value) false
+      (= oldstate state) (do (set! oldstate state)
+                             false)
+      :else true))
 
   IReset
   (-reset! [a new-value]
@@ -452,15 +460,13 @@
       (._handle-result this (._unchecked-exec this f))
       (._run-reactive this)))
 
-  (_refresh [this]
+  (_refresh [this _]
     (let [dirty (cond
                   (neg? age) true
                   (>= age atom-generation) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
-                                              (or d (if (instance? Reaction r)
-                                                      (._refresh r)
-                                                      (< age (.-age r)))))
+                                              (or d (._refresh r age)))
                                             false watching))]
       (set! age (if dirty -1 generation))
       dirty))
@@ -484,7 +490,7 @@
     (when-some [e caught]
       (throw e))
     (notify-deref-watcher! this)
-    (when ^boolean (._refresh this)
+    (when ^boolean (._refresh this 0)
       (when running (throw (js/Error. recursion-error)))
       (._run this))
     state)
