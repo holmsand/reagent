@@ -89,7 +89,7 @@
         ;; Use setTimeout to allow the browser to catch up and handle events.
         ;; Reduce framerate if rendering is very slow.
         (js/setTimeout (fn [] (next-tick #(.run-queues this)))
-                       (max 10 (min (* 0.5 rendtime) 200))))))
+                       (max 10 (min (* 0.65 rendtime) 200))))))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
