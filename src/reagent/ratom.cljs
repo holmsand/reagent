@@ -182,8 +182,8 @@
 
 (defn atom
   "Like clojure.core/atom, except that it keeps track of derefs."
-  ([x] (RAtom. x nil nil nil -no-value -1))
-  ([x & {:keys [meta validator]}] (RAtom. x meta validator nil -no-value -1)))
+  ([x] (->RAtom x nil nil nil -no-value -1))
+  ([x & {:keys [meta validator]}] (->RAtom x meta validator nil -no-value -1)))
 
 
 ;;; track
@@ -237,7 +237,7 @@
   (-pr-writer [a w opts] (pr-atom a w opts "Track:")))
 
 (defn make-track [f args]
-  (Track. f args nil))
+  (->Track f args nil))
 
 (defn make-track! [f args]
   (let [t (make-track f args)
@@ -324,7 +324,7 @@
                    (not (vector? src))))
           (str "src must be a reactive atom or a function, not "
                (pr-str src)))
-  (RCursor. src path nil nil nil))
+  (->RCursor src path nil nil nil))
 
 
 ;;; with-let support
@@ -603,9 +603,9 @@
   (-pr-writer [a w opts] (pr-atom a w opts "Wrap:")))
 
 (defn make-wrapper [value callback-fn args]
-  (Wrapper. value
-            (util/partial-ifn. callback-fn args nil)
-            false nil))
+  (->Wrapper value
+             (util/partial-ifn. callback-fn args nil)
+             false nil))
 
 
 

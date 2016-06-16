@@ -102,7 +102,7 @@
       (run-queue cs))
     (.flush-after-render this)))
 
-(def render-queue (RenderQueue. false false))
+(def render-queue (->RenderQueue false false))
 
 (defn flush []
   (.flush-queues render-queue))
