@@ -8,9 +8,9 @@
 
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
-(defonce ^:private generation 1)
-(defonce ^:private with-let-gen 1)
-(defonce ^:private -nwatches 0)
+(defonce ^:private ^number generation 1)
+(defonce ^:private ^number with-let-gen 1)
+(defonce ^:private ^number -nwatches 0)
 
 (defn ^boolean reactive? []
   (some? *ratom-context*))
@@ -84,15 +84,25 @@
 ;;; Queueing
 
 (defonce ^:private ratom-queue nil)
+(defonce ^:private ^number flush-generation -1)
 (defonce ^:private -no-value #js {})
 (defonce ^:private -unique-value #js {})
 
-(defn flush! []
+(defn- flush-atoms []
+  (assert (== flush-generation -1) "Can't flush in flush")
+  (set! flush-generation generation)
   (let [q ratom-queue]
     (when-not (nil? q)
       (set! ratom-queue nil)
       (dotimes [i (alength q)]
         (._notify (aget q i))))))
+
+(defn flush! []
+  (try (flush-atoms)
+       (finally (set! flush-generation -1))))
+
+(defn- ^number cur-gen []
+  (if (== flush-generation -1) generation flush-generation))
 
 (set! batch/ratom-flush flush!)
 
@@ -135,6 +145,7 @@
   (_notify [a]
     (try
       (when (not= oldstate state)
+        (set! oldstate -no-value)
         (notify-r a))
       (finally
         (set! oldstate -no-value))))
@@ -411,21 +422,23 @@
   (_unchecked-exec [r f]
     (set! age dont-update)
     (set! caught nil)
-    (try (f)
-         (finally (set! age generation))))
+    (let [gen (cur-gen)]
+      (try (f)
+           (finally (set! age gen)))))
 
   (_try-exec [this f]
     (set! age dont-update)
     (set! caught nil)
-    (try (f)
-         (catch :default e
-           (when (= recursion-error (.-message e)) (throw e))
-           (error "Error in Reaction: " e)
-           (set! caught e))
-         (finally (set! age generation))))
+    (let [gen (cur-gen)]
+      (try (f)
+           (catch :default e
+             (when (= recursion-error (.-message e)) (throw e))
+             (error "Error in Reaction: " e)
+             (set! caught e))
+           (finally (set! age gen)))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (-> watches count pos?)
+    (let [has-w (and (not (nil? watches)) (-> watches count pos?))
           has-r (-> reactions count pos?)]
       (when (and (or has-w has-r)
                  (not= oldstate newstate))
@@ -436,7 +449,7 @@
     (let [oldstate state]
       (when-not nocache?
         (set! state res))
-      (when (not= derefed watching)
+      (when-not (= derefed watching)
         (._update-watching this derefed))
       (when-not nocache?
         (._maybe-notify this oldstate res)))
@@ -454,12 +467,12 @@
   (_refresh [this _]
     (let [dirty (cond
                   (neg? age) true
-                  (>= age generation) false
+                  (>= age (cur-gen)) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
                                               (or d ^boolean (._refresh r age)))
                                             false watching))]
-      (set! age (if dirty -1 generation))
+      (set! age (if dirty -1 (cur-gen)))
       dirty))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]

@@ -513,3 +513,34 @@
     (is (= @t -11))
     (dispose t)
     (is (= runs (running)))))
+
+(deftest reset-in-reaction-update
+  (let [runs (running)
+        s (r/atom {:a 0})
+        count (atom 0)
+        spy (atom 0)
+        r (reaction (let [{v :foo} @s]
+                      (if (< v 3)
+                        (swap! s update-in [:foo] inc))
+                      (reset! spy [(:foo @s)])
+                      (swap! count inc)
+                      v))
+        run (run! @r)]
+    (is (= @spy [1]))
+    (is (= @count 1))
+
+    (rv/flush!)
+    (is (= @spy [2]))
+    (is (= @count 2))
+
+    (rv/flush!)
+    (is (= @spy [3]))
+    (is (= @count 3))
+
+    (rv/flush!)
+    (is (= @spy [3]))
+    (is (= @count 4))
+
+    (rv/flush!)
+    (is (= @spy [3]))
+    (is (= @count 4))))
