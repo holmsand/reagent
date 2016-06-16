@@ -1,15 +1,14 @@
 (ns reagent.ratom
   (:refer-clojure :exclude [atom])
   (:require-macros [reagent.ratom :refer [with-let]])
-  (:require [reagent.impl.util :as util]
+  (:require [clojure.set :as s]
             [reagent.debug :refer-macros [dbg log warn error dev? time]]
             [reagent.impl.batching :as batch]
-            [clojure.set :as s]))
+            [reagent.impl.util :as util]))
 
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
 (defonce ^:private generation 1)
-(defonce ^:private atom-generation 1)
 (defonce ^:private with-let-gen 1)
 (defonce ^:private -nwatches 0)
 
@@ -75,15 +74,8 @@
             a)
         len (alength a)
         age (.-age this)]
-    (dotimes [i len]
-      (let [r (aget a i)]
-        (when (> age (.-age r))
-          ;; Mark as dirty
-          (set! (.-age r) -1))))
-    (dotimes [i len]
-      (let [r (aget a i)]
-        (when (== (.-age r) -1)
-          (._handle-change r))))))
+    (dotimes [i len] (._mark-dirty (aget a i) age))
+    (dotimes [i len] (._handle-change (aget a i)))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -103,8 +95,7 @@
     (when-not (nil? q)
       (set! ratom-queue nil)
       (dotimes [i (alength q)]
-        (let [a (aget q i)]
-          (._notify a))))))
+        (._notify (aget q i))))))
 
 (set! batch/ratom-flush flush!)
 
@@ -136,7 +127,7 @@
   (_remove-reaction [this r] (remove-r this r))
 
   (_enqueue [a old]
-    (set! age (set! atom-generation (set! generation (inc generation))))
+    (set! age (set! generation (inc generation)))
     (when (identical? oldstate -no-value)
       (set! oldstate old)
       (when (nil? ratom-queue)
@@ -155,8 +146,7 @@
     (cond
       (>= compare age) false
       (identical? oldstate -no-value) false
-      (= oldstate state) (do (set! oldstate state)
-                             false)
+      (= oldstate state) (do (set! oldstate state) false)
       :else true))
 
   IReset
@@ -402,9 +392,12 @@
                  (-> reactions count zero?))
         (dispose! this))))
 
+  (_mark-dirty [this otherage]
+    (when (and (> otherage age) (not running))
+      (set! age -1)))
+
   (_handle-change [this]
-    (when-not (or running (nil? watching))
-      (set! age -1)
+    (when (and (== age -1) (not running) (some? watching))
       (case auto-run
         (nil true) (._run-reactive this)
         (auto-run this))))
@@ -442,15 +435,14 @@
           has-r (-> reactions count pos?)]
       (when (and (or has-w has-r)
                  (not= oldstate newstate))
-        (set! age (set! generation (inc generation)))
         (when has-w (notify-w this oldstate newstate))
         (when has-r (notify-r this)))))
 
   (_handle-result [this res derefed]
     (let [oldstate state]
+      (set! age generation)
       (when-not nocache?
         (set! state res))
-      (set! age generation)
       (when (not= derefed watching)
         (._update-watching this derefed))
       (when-not nocache?
@@ -469,7 +461,7 @@
   (_refresh [this _]
     (let [dirty (cond
                   (neg? age) true
-                  (>= age atom-generation) false
+                  (>= age generation) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
                                               (or d ^boolean (._refresh r age)))
@@ -530,7 +522,6 @@
   IHash
   (-hash [this] (goog/getUid this)))
 
-
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
   {:pre [(ifn? f)
          (or (nil? on-set) (fn? on-set))
@@ -541,7 +532,6 @@
     (if on-set
       (._set-opts reaction {:on-set on-set}))
     reaction))
-
 
 
 (def ^:private temp-reaction (make-reaction (fn [])))

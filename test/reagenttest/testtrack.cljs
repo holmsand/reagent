@@ -58,6 +58,62 @@
     (dispose const)
     (is (= (running) runs))))
 
+(deftest test-equal
+  (let [runs (running)
+        start (rv/atom {:n 0})
+        svf (fn [] @start)
+        sv (track svf)
+        compf (fn [x] @sv {:n (+ x (:n @sv))})
+        comp (track compf 2)
+        c2f (fn [] {:n (inc (:n @comp))})
+        count (rv/atom 0)
+        out (rv/atom 0)
+        resf (fn []
+               (swap! count inc)
+               (+ (:n @sv) (:n @(track c2f)) (:n @comp)))
+        res (track resf)
+        const (run!
+               (reset! out @res))]
+    (is (= @count 1) "constrain ran")
+    (is (= @out 5))
+    (reset! start {:n 1})
+    (r/flush)
+    (is (= @out 8))
+    (is (= @count 2))
+
+    (is (= @const 8))
+    (is (= @count 2))
+
+    (is (= @res 8))
+    (is (= @count 2))
+    (is (= (resf) 8))
+    (is (= @count 3))
+
+    (reset! start {:n 1})
+    (r/flush)
+    (is (= @count 3))
+
+    (reset! start {:n 2})
+    (r/flush)
+    (is (= @count 4))
+    (is (= (resf) @out))
+    (is (= @count 5))
+    (is (= @out @const))
+    (is (= @count 5))
+
+    (reset! start {:n 3})
+    (is (= 14 @const))
+    (is (= @count 6))
+    (is (= (resf) @out))
+    (is (= @count 7))
+    (is (= @out @const))
+    (is (= @count 7))
+    (r/flush)
+    (is (= @count 7))
+
+    (dispose const)
+    (is (= (running) runs))))
+
 (deftest test-track!
   (sync)
   (let [runs (running)
@@ -93,6 +149,7 @@
 (deftest repeat-tests
   (dotimes [_ testite]
     (basic-ratom)
+    (test-equal)
     (test-track!)))
 
 (deftest double-dependency
