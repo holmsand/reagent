@@ -41,7 +41,7 @@
     (reset! start 1)
     (r/flush)
     (is (= @out 3))
-    (is (<= 2 @count 3))
+    (is (= 2 @count))
     (dispose const)
     (is (= @start-base {:a {:b {:c 1}}}))
     (is (= (running) runs))))
@@ -107,6 +107,7 @@
           a1 (reaction (inc @a))
           a2 (reaction @a)
           b-changed (rv/atom 0)
+          b-saved (atom 0)
           c-changed (rv/atom 0)
           b (reaction
              (swap! b-changed inc)
@@ -129,18 +130,19 @@
       (reset! a 2)
       (is (= @res (+ 10 @a)))
       (is (<= 2 @b-changed 3))
+      (reset! b-saved @b-changed)
       (is (= @c-changed 1))
       (is (= @a-base {:test {:unsubscribe 2 :value 42}}))
 
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (<= 2 @b-changed 3))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
       (is (= @a-base {:test {:unsubscribe 3 :value 42}}))
 
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (<= 2 @b-changed 3))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
       (is (= @a-base {:test {:unsubscribe 3 :value 42}}))
 
