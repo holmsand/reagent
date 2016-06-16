@@ -71,11 +71,9 @@
                   rs (if debug (shuffle rs) rs)]
               ;; Copy watches to array for speed
               (set! (.-reactionsArr this) (into-array rs)))
-            a)
-        len (alength a)
-        age (.-age this)]
-    (dotimes [i len] (._mark-dirty (aget a i) age))
-    (dotimes [i len] (._handle-change (aget a i)))))
+            a)]
+    (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
+    (dotimes [i (alength a)] (._handle-change (aget a i)))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -86,7 +84,6 @@
 ;;; Queueing
 
 (defonce ^:private ratom-queue nil)
-
 (defonce ^:private -no-value #js {})
 (defonce ^:private -unique-value #js {})
 
@@ -350,11 +347,11 @@
   (run [this]))
 
 (def recursion-error "Recursion in Reaction not allowed")
+(def dont-update (dec (js/Math.pow 2 53))) ; max int
 
 (deftype Reaction [f ^:mutable state ^boolean nocache? ^:mutable watching
                    ^:mutable reactions ^:mutable auto-run ^:mutable caught
-                   ^:mutable ^number age ^:mutable ^boolean running
-                   ^:mutable on-dispose]
+                   ^:mutable ^number age ^:mutable on-dispose]
   IAtom
   IReactiveAtom
 
@@ -393,11 +390,11 @@
         (dispose! this))))
 
   (_mark-dirty [this otherage]
-    (when (and (> otherage age) (not running))
+    (when (> otherage age)
       (set! age -1)))
 
   (_handle-change [this]
-    (when (and (== age -1) (not running) (some? watching))
+    (when (and (== age -1) (some? watching))
       (case auto-run
         (nil true) (._run-reactive this)
         (auto-run this))))
@@ -412,23 +409,20 @@
         (._remove-reaction w this))))
 
   (_unchecked-exec [r f]
-    (set! running true)
+    (set! age dont-update)
     (set! caught nil)
     (try (f)
-         (finally (set! running false))))
+         (finally (set! age generation))))
 
   (_try-exec [this f]
-    (set! running true)
+    (set! age dont-update)
     (set! caught nil)
     (try (f)
          (catch :default e
-           (when (= recursion-error (.-message e))
-             (throw e))
+           (when (= recursion-error (.-message e)) (throw e))
            (error "Error in Reaction: " e)
-           (set! state e)
-           (set! caught e)
-           (set! age -1))
-         (finally (set! running false))))
+           (set! caught e))
+         (finally (set! age generation))))
 
   (_maybe-notify [this oldstate newstate]
     (let [has-w (-> this .-watches count pos?)
@@ -440,7 +434,6 @@
 
   (_handle-result [this res derefed]
     (let [oldstate state]
-      (set! age generation)
       (when-not nocache?
         (set! state res))
       (when (not= derefed watching)
@@ -470,14 +463,10 @@
       dirty))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
-    (when (some? auto-run)
-      (set! (.-auto-run this) auto-run))
-    (when (some? on-set)
-      (set! (.-on-set this) on-set))
-    (when (some? no-cache)
-      (set! (.-nocache? this) no-cache))
-    (when (some? on-dispose)
-      (add-on-dispose! this on-dispose)))
+    (when (some? auto-run)   (set! (.-auto-run this) auto-run))
+    (when (some? on-set)     (set! (.-on-set this) on-set))
+    (when (some? no-cache)   (set! (.-nocache? this) no-cache))
+    (when (some? on-dispose) (add-on-dispose! this on-dispose)))
 
   IRunnable
   (run [this]
@@ -485,11 +474,10 @@
 
   IDeref
   (-deref [this]
-    (when-some [e caught]
-      (throw e))
+    (when (some? caught) (throw caught))
+    (when (== age dont-update) (throw (js/Error. recursion-error)))
     (notify-deref-watcher! this)
     (when ^boolean (._refresh this 0)
-      (when running (throw (js/Error. recursion-error)))
       (._run this))
     state)
 
@@ -528,7 +516,7 @@
          (or (nil? auto-run) (true? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
   (let [od (and on-dispose (array on-dispose))
-        reaction (->Reaction f nil false nil nil auto-run nil -1 false od)]
+        reaction (->Reaction f nil false nil nil auto-run nil -1 od)]
     (if on-set
       (._set-opts reaction {:on-set on-set}))
     reaction))
