@@ -20,23 +20,23 @@
 
 (defn running [] -nwatches)
 
-(declare ^:dynamic -captured)
+(declare ^:dynamic *-captured*)
 
 (defn- deref-capture [r f ^boolean update ^boolean check]
   (when (dev?)
     (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
   (binding [*ratom-context* r
-            -captured {}]
+            *-captured* {}]
     (let [res (if check
                 (._try-exec r f)
                 (._unchecked-exec r f))]
       (if update
-        (._handle-result r res -captured)
-        [res -captured]))))
+        (._handle-result r res *-captured*)
+        [res *-captured*]))))
 
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
-    (set! -captured (assoc -captured derefed nil))))
+    (set! *-captured* (assoc *-captured* derefed nil))))
 
 (defn- add-w [this key f]
   (set! (.-watches this) (assoc (.-watches this) key f)))
@@ -206,7 +206,7 @@
                                      (when (some? destroy)
                                        (destroy s))))
                   v (-deref r)]
-              (aset o cache-key (assoc m k r))
+              (aset o cache-key (assoc (if (nil? m) {} m) k r))
               (when debug (set! -nwatches (inc -nwatches)))
               (when (some? obj)
                 (set! (.-reaction obj) r))
@@ -349,9 +349,9 @@
 (def recursion-error "Recursion in Reaction not allowed")
 (def dont-update (dec (js/Math.pow 2 53))) ; max int
 
-(deftype Reaction [f ^:mutable state ^boolean nocache? ^:mutable watching
-                   ^:mutable reactions ^:mutable auto-run ^:mutable caught
-                   ^:mutable ^number age ^:mutable on-dispose]
+(deftype Reaction [f ^:mutable state ^:mutable ^number age ^:mutable caught
+                   ^:mutable reactions ^:mutable watches ^:mutable watching
+                   ^:mutable auto-run ^:mutable on-dispose ^boolean nocache?]
   IAtom
   IReactiveAtom
 
@@ -362,10 +362,10 @@
 
   IReset
   (-reset! [a newval]
-    (assert (fn? (.-on-set a)) "Reaction is read only.")
-    (let [oldval state]
+    (assert (some? (.-on-set a)) "Reaction is read only.")
+    (let [old state]
       (set! state newval)
-      (.on-set a oldval newval)
+      (.on-set a old newval)
       newval))
 
   ISwap
@@ -425,7 +425,7 @@
          (finally (set! age generation))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (-> this .-watches count pos?)
+    (let [has-w (-> watches count pos?)
           has-r (-> reactions count pos?)]
       (when (and (or has-w has-r)
                  (not= oldstate newstate))
@@ -516,26 +516,29 @@
          (or (nil? auto-run) (true? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
   (let [od (and on-dispose (array on-dispose))
-        reaction (->Reaction f nil false nil nil auto-run nil -1 od)]
+        reaction (->Reaction f nil -1 nil
+                             nil nil nil
+                             auto-run od false)]
     (if on-set
       (._set-opts reaction {:on-set on-set}))
     reaction))
 
 
-(def ^:private temp-reaction (make-reaction (fn [])))
+(def ^:private no-op (fn []))
+(def ^:private temp-reaction (make-reaction no-op))
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (deref-capture r f true false)]
     (when-not (nil? (.-watching r))
-      (set! temp-reaction (make-reaction (fn [])))
+      (set! temp-reaction (make-reaction no-op))
       (._set-opts r opts)
       (set! (.-f r) f)
       (set! (.-auto-run r) #(run obj))
       (aset obj key r))
     res))
 
-(def ^:private check-reaction (make-reaction (fn [])))
+(def ^:private check-reaction (make-reaction no-op))
 
 (defn check-derefs [f]
   (let [[res captured] (deref-capture check-reaction f false false)]
