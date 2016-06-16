@@ -23,8 +23,7 @@
 (declare ^:dynamic *-captured*)
 
 (defn- deref-capture [r f ^boolean update ^boolean check]
-  (when (dev?)
-    (set! (.-ratomGeneration r) (set! with-let-gen (inc with-let-gen))))
+  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
   (binding [*ratom-context* r
             *-captured* {}]
     (let [res (if check
@@ -50,8 +49,7 @@
       (f key this old new))))
 
 (defn- check-watches [old new]
-  (when debug
-    (set! -nwatches (+ -nwatches (- (count new) (count old)))))
+  (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
 (defn- add-r [this r]
@@ -419,17 +417,18 @@
       (doseq [w (s/difference old new)]
         (._remove-reaction w this))))
 
-  (_unchecked-exec [r f]
+  (_prepare-exec [_]
     (set! age dont-update)
     (set! caught nil)
-    (let [gen (cur-gen)]
+    (cur-gen))
+
+  (_unchecked-exec [this f]
+    (let [gen (._prepare-exec this)]
       (try (f)
            (finally (set! age gen)))))
 
   (_try-exec [this f]
-    (set! age dont-update)
-    (set! caught nil)
-    (let [gen (cur-gen)]
+    (let [gen (._prepare-exec this)]
       (try (f)
            (catch :default e
              (when (= recursion-error (.-message e)) (throw e))
