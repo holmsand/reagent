@@ -437,20 +437,19 @@
              (set! caught e))
            (finally (set! age gen)))))
 
-  (_maybe-notify [this oldstate newstate]
+  (_maybe-notify [this old new]
     (when (and (not (and (nil? watches) (nil? reactions)))
-               (not= oldstate newstate))
-      (notify-w this oldstate newstate)
+               (not= old new))
+      (notify-w this old new)
       (notify-r this)))
 
   (_handle-result [this res derefed]
-    (let [oldstate state]
+    (let [old state]
       (when-not nocache?
         (set! state res))
       (when-not (= derefed watching)
         (._update-watching this derefed))
-      (when-not nocache?
-        (._maybe-notify this oldstate res)))
+      (._maybe-notify this old res))
     res)
 
   (_run-reactive [this]
@@ -541,7 +540,7 @@
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (deref-capture r f true false)]
-    (when-not (nil? (.-watching r))
+    (when (-> r .-watching count pos?)
       (set! temp-reaction (make-reaction no-op))
       (._set-opts r opts)
       (set! (.-f r) f)
