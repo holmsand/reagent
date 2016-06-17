@@ -41,7 +41,8 @@
   (set! (.-watches this) (assoc (.-watches this) key f)))
 
 (defn- remove-w [this key]
-  (set! (.-watches this) (dissoc (.-watches this) key)))
+  (let [ws (dissoc (.-watches this) key)]
+    (set! (.-watches this) (when (-> ws count pos?) ws))))
 
 (defn- notify-w [this old new]
   (when-some [ws (.-watches this)]
@@ -58,20 +59,22 @@
     (set! (.-reactionsArr this) nil)))
 
 (defn- remove-r [this r]
-  (let [w (.-reactions this)]
-    (set! (.-reactions this) (check-watches w (disj w r)))
+  (let [w (.-reactions this)
+        w' (disj w r)
+        w' (when (-> w' count pos?) w')]
+    (set! (.-reactions this) (check-watches w w'))
     (set! (.-reactionsArr this) nil)))
 
 (defn- notify-r [this]
-  (let [a (.-reactionsArr this)
-        a (if (nil? a)
-            (let [rs (.-reactions this)
-                  rs (if debug (shuffle rs) rs)]
+  (when-some [rs (.-reactions this)]
+    (let [a (.-reactionsArr this)
+          a (if (nil? a)
               ;; Copy watches to array for speed
-              (set! (.-reactionsArr this) (into-array rs)))
-            a)]
-    (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
-    (dotimes [i (alength a)] (._handle-change (aget a i)))))
+              (set! (.-reactionsArr this)
+                    (into-array (if debug (shuffle rs) rs)))
+              a)]
+      (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
+      (dotimes [i (alength a)] (._handle-change (aget a i))))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -99,7 +102,7 @@
   (try (flush-atoms)
        (finally (set! flush-generation -1))))
 
-(defn- ^number cur-gen []
+(defn- ^number atom-generation []
   (if (== flush-generation -1) generation flush-generation))
 
 (set! batch/ratom-flush flush!)
@@ -391,11 +394,9 @@
   (_add-reaction [this r] (add-r this r))
 
   (_remove-reaction [this r]
-    (let [was-empty (-> reactions count zero?)]
+    (let [rs reactions]
       (remove-r this r)
-      (when (and (nil? auto-run)
-                 (not was-empty)
-                 (-> reactions count zero?))
+      (when (and (nil? auto-run) (some? rs) (nil? reactions))
         (dispose! this))))
 
   (_mark-dirty [this otherage]
@@ -404,8 +405,8 @@
 
   (_handle-change [this]
     (when (and (== age -1) (some? watching))
-      (case auto-run
-        (nil true) (._run-reactive this)
+      (if (or (nil? auto-run) (true? auto-run))
+        (._run-reactive this)
         (auto-run this))))
 
   (_update-watching [this derefed]
@@ -420,7 +421,7 @@
   (_prepare-exec [_]
     (set! age dont-update)
     (set! caught nil)
-    (cur-gen))
+    (atom-generation))
 
   (_unchecked-exec [this f]
     (let [gen (._prepare-exec this)]
@@ -437,12 +438,10 @@
            (finally (set! age gen)))))
 
   (_maybe-notify [this oldstate newstate]
-    (let [has-w (and (not (nil? watches)) (-> watches count pos?))
-          has-r (-> reactions count pos?)]
-      (when (and (or has-w has-r)
-                 (not= oldstate newstate))
-        (when has-w (notify-w this oldstate newstate))
-        (when has-r (notify-r this)))))
+    (when (and (not (and (nil? watches) (nil? reactions)))
+               (not= oldstate newstate))
+      (notify-w this oldstate newstate)
+      (notify-r this)))
 
   (_handle-result [this res derefed]
     (let [oldstate state]
@@ -466,12 +465,12 @@
   (_refresh [this _]
     (let [dirty (cond
                   (neg? age) true
-                  (>= age (cur-gen)) false
+                  (>= age (atom-generation)) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
                                               (or d ^boolean (._refresh r age)))
                                             false watching))]
-      (set! age (if dirty -1 (cur-gen)))
+      (set! age (if dirty -1 (atom-generation)))
       dirty))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -486,7 +485,7 @@
 
   IDeref
   (-deref [this]
-    (when (some? caught) (throw caught))
+    (when-not (nil? caught) (throw caught))
     (when (== age dont-update) (throw (js/Error. recursion-error)))
     (notify-deref-watcher! this)
     (when ^boolean (._refresh this 0)
