@@ -360,8 +360,9 @@
 
 (def recursion-error "Recursion in Reaction not allowed")
 (def dont-update (dec (js/Math.pow 2 53))) ; max int
+(deftype ReactionEx [error])
 
-(deftype Reaction [f ^:mutable state ^:mutable ^number age ^:mutable caught
+(deftype Reaction [f ^:mutable state ^:mutable ^number age
                    ^:mutable reactions ^:mutable watches ^:mutable watching
                    ^:mutable auto-run ^:mutable on-dispose ^boolean nocache?]
   IAtom
@@ -418,23 +419,20 @@
       (doseq [w (s/difference old new)]
         (._remove-reaction w this))))
 
-  (_prepare-exec [_]
-    (set! age dont-update)
-    (set! caught nil)
-    (atom-generation))
-
   (_unchecked-exec [this f]
-    (let [gen (._prepare-exec this)]
+    (set! age dont-update)
+    (let [gen (atom-generation)]
       (try (f)
            (finally (set! age gen)))))
 
   (_try-exec [this f]
-    (let [gen (._prepare-exec this)]
+    (set! age dont-update)
+    (let [gen (atom-generation)]
       (try (f)
            (catch :default e
              (when (= recursion-error (.-message e)) (throw e))
              (error "Error in Reaction: " e)
-             (set! caught e))
+             (->ReactionEx e))
            (finally (set! age gen)))))
 
   (_maybe-notify [this old new]
@@ -456,8 +454,7 @@
     (deref-capture this f true (nil? auto-run)))
 
   (_run [this]
-    (if (and (nil? *ratom-context*)
-             (nil? auto-run))
+    (if (and (nil? *ratom-context*) (nil? auto-run))
       (._handle-result this (._unchecked-exec this f))
       (._run-reactive this)))
 
@@ -484,7 +481,7 @@
 
   IDeref
   (-deref [this]
-    (when-not (nil? caught) (throw caught))
+    (when (instance? ReactionEx state) (throw (.-error state)))
     (when (== age dont-update) (throw (js/Error. recursion-error)))
     (notify-deref-watcher! this)
     (when ^boolean (._refresh this 0)
@@ -526,8 +523,7 @@
          (or (nil? auto-run) (true? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
   (let [od (and on-dispose (array on-dispose))
-        reaction (->Reaction f nil -1 nil
-                             nil nil nil
+        reaction (->Reaction f nil -1 nil nil nil
                              auto-run od false)]
     (if on-set
       (._set-opts reaction {:on-set on-set}))
