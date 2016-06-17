@@ -76,20 +76,17 @@
   (run-queues [this]
     (set! running true)
     (set! scheduled? false)
-    (let [start (system-time)
-          _ (try
-              (.flush-queues this)
-              (set! running false)
-              (finally
-                (when running
-                  (set! running false)
-                  (set! scheduled? false))))
-          rendtime (- (system-time) start)]
-      (when scheduled?
-        ;; Use setTimeout to allow the browser to catch up and handle events.
-        ;; Reduce framerate if rendering is very slow.
-        (js/setTimeout (fn [] (next-tick #(.run-queues this)))
-                       (max 10 (min (* 0.65 rendtime) 200))))))
+    (try
+      (.flush-queues this)
+      (set! running false)
+      (finally
+        (when running
+          (set! running false)
+          (set! scheduled? false))))
+    (when scheduled?
+      ;; Use setTimeout to allow the browser to catch up and handle events.
+      (js/setTimeout (fn [] (next-tick #(.run-queues this)))
+                     0)))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
