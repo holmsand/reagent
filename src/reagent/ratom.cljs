@@ -362,9 +362,9 @@
 (def dont-update (dec (js/Math.pow 2 53))) ; max int
 (deftype ReactionEx [error])
 
-(deftype Reaction [f ^:mutable state ^:mutable ^number age
-                   ^:mutable reactions ^:mutable watches ^:mutable watching
-                   ^:mutable auto-run ^:mutable on-dispose ^boolean nocache?]
+(deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
+                   ^:mutable ^number age
+                   ^:mutable reactions ^:mutable watches ^:mutable watching]
   IAtom
   IReactiveAtom
 
@@ -443,7 +443,7 @@
 
   (_handle-result [this res derefed]
     (let [old state]
-      (when-not nocache?
+      (when-not (identical? old -no-value)
         (set! state res))
       (when-not (= derefed watching)
         (._update-watching this derefed))
@@ -472,7 +472,7 @@
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)   (set! (.-auto-run this) auto-run))
     (when (some? on-set)     (set! (.-on-set this) on-set))
-    (when (some? no-cache)   (set! (.-nocache? this) no-cache))
+    (when (true? no-cache)   (set! state -no-value))
     (when (some? on-dispose) (add-on-dispose! this on-dispose)))
 
   IRunnable
@@ -523,8 +523,7 @@
          (or (nil? auto-run) (true? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
   (let [od (and on-dispose (array on-dispose))
-        reaction (->Reaction f nil -1 nil nil nil
-                             auto-run od false)]
+        reaction (->Reaction f nil auto-run od -1 nil nil nil)]
     (if on-set
       (._set-opts reaction {:on-set on-set}))
     reaction))
