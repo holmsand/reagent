@@ -92,11 +92,10 @@
 (defn- flush-atoms []
   (assert (== flush-generation -1) "Can't flush in flush")
   (set! flush-generation generation)
-  (let [q ratom-queue]
-    (when-not (nil? q)
-      (set! ratom-queue nil)
-      (dotimes [i (alength q)]
-        (._notify (aget q i))))))
+  (when-some [q ratom-queue]
+    (set! ratom-queue nil)
+    (dotimes [i (alength q)]
+      (._notify (aget q i)))))
 
 (defn flush! []
   (try (flush-atoms)
@@ -504,9 +503,9 @@
   (add-on-dispose! [this f]
     ;; f is called with the reaction and last state as arguments when
     ;; it is no longer active
-    (if (nil? on-dispose)
-      (set! on-dispose (array f))
-      (.push on-dispose f)))
+    (if-some [od on-dispose]
+      (.push od f)
+      (set! on-dispose (array f))))
 
   IEquiv
   (-equiv [o other] (identical? o other))

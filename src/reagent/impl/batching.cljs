@@ -47,9 +47,9 @@
   Object
   (enqueue [this k f]
     (assert (some? f))
-    (when (nil? (aget this k))
-      (aset this k (array)))
-    (.push (aget this k) f)
+    (if-some [q (aget this k)]
+      (.push q f)
+      (aset this k (array f)))
     (.schedule this))
 
   (run-funs [this k]
