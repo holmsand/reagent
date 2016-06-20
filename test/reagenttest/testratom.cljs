@@ -545,4 +545,48 @@
 
     (rv/flush!)
     (is (= @spy [3]))
-    (is (= @count 4))))
+    (is (= @count 4))
+
+    (dispose run)
+    (is (= runs (running)))))
+
+(deftest reaction-update
+  (let [runs (running)
+        val (rv/atom 0)
+        count (atom 0)
+        a (reaction (quot @val 2))
+        res (run! (swap! count inc)
+                  @a)]
+
+    (is (= @count 1))
+    (is (= @res 0))
+
+    (reset! val 1)
+    (is (= @res 0))
+    (is (= @count 1))
+
+    (reset! val 2)
+    (is (= @res 1))
+    (is (= @count 2))
+
+    (reset! val 3)
+    (rv/flush!)
+    (is (= @count 2))
+    (is (= @res 1))
+
+    (reset! val 4)
+    (rv/flush!)
+    (is (= @count 3))
+    (is (= @res 2))
+
+    (reset! val 5)
+    (is (= @res 2))
+    (is (= @count 3))
+
+    (reset! val 6)
+    (rv/flush!)
+    (is (= @count 4))
+    (is (= @res 3))
+
+    (dispose res)
+    (is (= runs (running)))))

@@ -359,6 +359,9 @@
 
 (def recursion-error "Recursion in Reaction not allowed")
 (def dont-update (dec (js/Math.pow 2 53))) ; max int
+(def rtrue (reduced true))
+(def rfalse (reduced false))
+
 (deftype ReactionEx [error])
 
 (deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
@@ -458,17 +461,23 @@
       (._run-reactive this)))
 
   (_refresh [this compare]
-    (let [dirty (cond
+    (let [a age
+          dirty (cond
                   (and (not (== compare -1))
                        (nil? reactions)) false
-                  (neg? age) true
-                  (>= age (atom-generation)) false
+                  (>= a (atom-generation)) false
+                  (neg? a) true
                   (nil? watching) true
-                  :else ^boolean (reduce-kv (fn [^boolean d r _]
-                                              (or d ^boolean (._refresh r age)))
+                  :else ^boolean (reduce-kv (fn [_ r _]
+                                              (cond
+                                                ^boolean (._refresh r a) rtrue
+                                                (not (== age a)) rfalse
+                                                :else false))
                                             false watching))]
       (if dirty
-        (._run this)
+        (if (== compare -1)
+          (._run this)
+          (._run-reactive this))
         (set! age (atom-generation)))
       false))
 
