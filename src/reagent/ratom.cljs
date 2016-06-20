@@ -457,16 +457,20 @@
       (._handle-result this (._unchecked-exec this f))
       (._run-reactive this)))
 
-  (_refresh [this _]
+  (_refresh [this compare]
     (let [dirty (cond
+                  (and (not (== compare -1))
+                       (nil? reactions)) false
                   (neg? age) true
                   (>= age (atom-generation)) false
                   (nil? watching) true
                   :else ^boolean (reduce-kv (fn [^boolean d r _]
                                               (or d ^boolean (._refresh r age)))
                                             false watching))]
-      (set! age (if dirty -1 (atom-generation)))
-      dirty))
+      (if dirty
+        (._run this)
+        (set! age (atom-generation)))
+      false))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
     (when (some? auto-run)   (set! (.-auto-run this) auto-run))
@@ -483,8 +487,7 @@
     (when (instance? ReactionEx state) (throw (.-error state)))
     (when (== age dont-update) (throw (js/Error. recursion-error)))
     (notify-deref-watcher! this)
-    (when ^boolean (._refresh this 0)
-      (._run this))
+    (._refresh this -1)
     state)
 
   IDisposable

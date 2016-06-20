@@ -194,6 +194,7 @@
           a1 (track af 1)
           a2 (track af 0)
           b-changed (rv/atom 0)
+          b-saved (atom 0)
           c-changed (rv/atom 0)
           mf (fn [v x spy]
                (swap! spy inc)
@@ -213,17 +214,18 @@
 
       (reset! a 2)
       (is (= @res (+ 10 @a)))
-      (is (= @b-changed 2))
+      (is (<= 2 @b-changed 3))
+      (reset! b-saved @b-changed)
       (is (= @c-changed 1))
 
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
 
       (reset! a 3)
       (is (= @res (+ 10 @a)))
-      (is (= @b-changed 2))
+      (is (= @b-changed @b-saved))
       (is (= @c-changed 2))
 
       (reset! a -1)
