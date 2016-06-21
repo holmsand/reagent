@@ -76,6 +76,15 @@
       (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
       (dotimes [i (alength a)] (._handle-change (aget a i))))))
 
+(def ^:private -empty-array (array))
+
+(defn- map-key-array [m]
+  (if (-> m count zero?)
+    -empty-array
+    (if-some [a (.-ratomMapKeyArray m)]
+      a
+      (set! (.-ratomMapKeyArray m) (-> m keys into-array)))))
+
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
   (pr-writer (binding [*ratom-context* nil] (-deref a)) writer opts)
@@ -359,8 +368,6 @@
 
 (def recursion-error "Recursion in Reaction not allowed")
 (def dont-update (dec (js/Math.pow 2 53))) ; max int
-(def rtrue (reduced true))
-(def rfalse (reduced false))
 
 (deftype ReactionEx [error])
 
@@ -460,20 +467,25 @@
       (._handle-result this (._unchecked-exec this f))
       (._run-reactive this)))
 
+  (_refresh-watching [this]
+    (let [ks (map-key-array watching)
+          len (alength ks)
+          a age]
+      (loop [i 0]
+        (when (< i len)
+          (if ^boolean (._refresh (aget ks i) a)
+            true
+            (when (== a (.-age this))
+              (recur (inc i))))))))
+
   (_refresh [this compare]
-    (let [a age
-          dirty (cond
+    (let [dirty (cond
                   (and (not (== compare -1))
                        (nil? reactions)) false
-                  (>= a (atom-generation)) false
-                  (neg? a) true
+                  (>= age (atom-generation)) false
+                  (neg? age) true
                   (nil? watching) true
-                  :else ^boolean (reduce-kv (fn [_ r _]
-                                              (cond
-                                                ^boolean (._refresh r a) rtrue
-                                                (not (== age a)) rfalse
-                                                :else false))
-                                            false watching))]
+                  :else (true? (._refresh-watching this)))]
       (if dirty
         (if (== compare -1)
           (._run this)
