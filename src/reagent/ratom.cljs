@@ -60,14 +60,17 @@
     -empty-array
     (if-some [a (.-ratomCollArray c)]
       a
-      (set! (.-ratomCollArray c) (into-array c)))))
+      (let [c (if debug (shuffle c) c)]
+        (set! (.-ratomCollArray c) (into-array c))))))
 
 (defn- map-key-array [m]
   (if (-> m count zero?)
     -empty-array
     (if-some [a (.-ratomMapKeyArray m)]
       a
-      (set! (.-ratomMapKeyArray m) (-> m keys into-array)))))
+      (let [c (keys m)
+            c (if debug (shuffle c) c)]
+        (set! (.-ratomMapKeyArray m) (into-array c))))))
 
 (defn- add-r [this r]
   (let [w (or (.-reactions this) #{})]
