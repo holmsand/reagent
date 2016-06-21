@@ -53,30 +53,14 @@
   (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
-(defn- add-r [this r]
-  (let [w (or (.-reactions this) #{})]
-    (set! (.-reactions this) (check-watches w (conj w r)))
-    (set! (.-reactionsArr this) nil)))
-
-(defn- remove-r [this r]
-  (let [w (.-reactions this)
-        w' (disj w r)
-        w' (when (-> w' count pos?) w')]
-    (set! (.-reactions this) (check-watches w w'))
-    (set! (.-reactionsArr this) nil)))
-
-(defn- notify-r [this]
-  (when-some [rs (.-reactions this)]
-    (let [a (.-reactionsArr this)
-          a (if (nil? a)
-              ;; Copy watches to array for speed
-              (set! (.-reactionsArr this)
-                    (into-array (if debug (shuffle rs) rs)))
-              a)]
-      (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
-      (dotimes [i (alength a)] (._handle-change (aget a i))))))
-
 (def ^:private -empty-array (array))
+
+(defn- coll-array [c]
+  (if (-> c count zero?)
+    -empty-array
+    (if-some [a (.-ratomCollArray c)]
+      a
+      (set! (.-ratomCollArray c) (into-array c)))))
 
 (defn- map-key-array [m]
   (if (-> m count zero?)
@@ -84,6 +68,22 @@
     (if-some [a (.-ratomMapKeyArray m)]
       a
       (set! (.-ratomMapKeyArray m) (-> m keys into-array)))))
+
+(defn- add-r [this r]
+  (let [w (or (.-reactions this) #{})]
+    (set! (.-reactions this) (check-watches w (conj w r)))))
+
+(defn- remove-r [this r]
+  (let [w (.-reactions this)
+        w' (disj w r)
+        w' (when (-> w' count pos?) w')]
+    (set! (.-reactions this) (check-watches w w'))))
+
+(defn- notify-r [this]
+  (when-some [rs (.-reactions this)]
+    (let [a (coll-array rs)]
+      (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
+      (dotimes [i (alength a)] (._handle-change (aget a i))))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
