@@ -60,17 +60,16 @@
     -empty-array
     (if-some [a (.-ratomCollArray c)]
       a
-      (let [c (if debug (shuffle c) c)]
-        (set! (.-ratomCollArray c) (into-array c))))))
+      (set! (.-ratomCollArray c)
+            (into-array (if debug (shuffle c) c))))))
 
 (defn- map-key-array [m]
   (if (-> m count zero?)
     -empty-array
     (if-some [a (.-ratomMapKeyArray m)]
       a
-      (let [c (keys m)
-            c (if debug (shuffle c) c)]
-        (set! (.-ratomMapKeyArray m) (into-array c))))))
+      (set! (.-ratomMapKeyArray m)
+            (into-array (if debug (shuffle (keys m)) (keys m)))))))
 
 (defn- add-r [this r]
   (let [w (or (.-reactions this) #{})]
@@ -390,7 +389,7 @@
     (assert (some? (.-on-set a)) "Reaction is read only.")
     (let [old state]
       (set! state newval)
-      (.on-set a old newval)
+      ((.-on-set a) old newval)
       newval))
 
   ISwap
@@ -448,8 +447,8 @@
            (finally (set! age gen)))))
 
   (_maybe-notify [this old new]
-    (when (and (not (and (nil? watches) (nil? reactions)))
-               (not= old new))
+    (when-not (or (and (nil? reactions) (nil? watches))
+                  (= old new))
       (notify-w this old new)
       (notify-r this)))
 
@@ -457,7 +456,8 @@
     (let [old state]
       (when-not (identical? old -no-value)
         (set! state res))
-      (when-not (= derefed watching)
+      (when (and (some? derefed)
+                 (not= derefed watching))
         (._update-watching this derefed))
       (._maybe-notify this old res))
     res)
@@ -467,7 +467,7 @@
 
   (_run [this]
     (if (and (nil? *ratom-context*) (nil? auto-run))
-      (._handle-result this (._unchecked-exec this f))
+      (._handle-result this (._unchecked-exec this f) nil)
       (._run-reactive this)))
 
   (_refresh-watching [this]
@@ -477,9 +477,10 @@
       (loop [i 0]
         (when (< i len)
           (if ^boolean (._refresh (aget ks i) a)
-            true
+            (._run-reactive this)
             (when (== a (.-age this))
-              (recur (inc i))))))))
+              (recur (inc i)))))))
+    false)
 
   (_refresh [this compare]
     (let [dirty (cond
@@ -488,11 +489,9 @@
                   (>= age (atom-generation)) false
                   (neg? age) true
                   (nil? watching) true
-                  :else (true? (._refresh-watching this)))]
+                  :else ^boolean (._refresh-watching this))]
       (if dirty
-        (if (== compare -1)
-          (._run this)
-          (._run-reactive this))
+        (._run this)
         (set! age (atom-generation)))
       false))
 
@@ -546,30 +545,29 @@
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
   {:pre [(ifn? f)
          (or (nil? on-set) (fn? on-set))
-         (or (nil? auto-run) (true? auto-run) (fn? auto-run))
+         (or (nil? auto-run) (true? auto-run) (false? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
-  (let [od (and on-dispose (array on-dispose))
-        reaction (->Reaction f nil auto-run od -1 nil nil nil)]
-    (if on-set
-      (._set-opts reaction {:on-set on-set}))
-    reaction))
+  (let [ar (if (false? auto-run) nil auto-run)
+        od (and on-dispose (array on-dispose))
+        r (->Reaction f nil ar od -1 nil nil nil)]
+    (when on-set (._set-opts r {:on-set on-set}))
+    r))
 
 
-(def ^:private no-op (fn []))
-(def ^:private temp-reaction (make-reaction no-op))
+(def ^:private temp-reaction (make-reaction (fn [])))
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (deref-capture r f true false)]
     (when (-> r .-watching count pos?)
-      (set! temp-reaction (make-reaction no-op))
+      (set! temp-reaction (make-reaction (fn [])))
       (._set-opts r opts)
       (set! (.-f r) f)
       (set! (.-auto-run r) #(run obj))
       (aset obj key r))
     res))
 
-(def ^:private check-reaction (make-reaction no-op))
+(def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
   (let [[res captured] (deref-capture check-reaction f false false)]
@@ -608,13 +606,13 @@
 
   IEquiv
   (-equiv [_ other]
-          (and (instance? Wrapper other)
-               ;; If either of the wrappers have changed, equality
-               ;; cannot be relied on.
-               (not changed)
-               (not (.-changed other))
-               (= state (.-state other))
-               (= callback (.-callback other))))
+    (and (instance? Wrapper other)
+         ;; If either of the wrappers have changed, equality
+         ;; cannot be relied on.
+         (not changed)
+         (not (.-changed other))
+         (= state (.-state other))
+         (= callback (.-callback other))))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
