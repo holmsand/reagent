@@ -245,6 +245,8 @@
            :autobind false
            :cljsLegacyRender legacy-render
            :reagentRender render-fun
+           :cljsRatom nil
+           :cljsState nil
            :render (:render static-fns))))
 
 (defn map-to-js [m]
