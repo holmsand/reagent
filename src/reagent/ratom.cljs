@@ -22,16 +22,10 @@
 
 (declare ^:dynamic *-captured*)
 
-(defn- deref-capture [r f ^boolean update ^boolean check shallow]
-  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
+(defn- deref-capture [r f update check shallow]
   (binding [*ratom-context* r
             *-captured* {}]
-    (let [res (if check
-                (._try-exec r f)
-                (._unchecked-exec r f))]
-      (if update
-        (._handle-result r res *-captured* shallow)
-        [res *-captured*]))))
+    (._captured-exec r f update check shallow)))
 
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
@@ -468,6 +462,15 @@
       (when caching
         (._maybe-notify this old res shallow)))
     res)
+
+  (_captured-exec [r f ^boolean update ^boolean check shallow]
+    (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
+    (let [res (if check
+                (._try-exec r f)
+                (._unchecked-exec r f))]
+      (if update
+        (._handle-result r res *-captured* shallow)
+        [res *-captured*])))
 
   (_run-reactive [this]
     (deref-capture this f true (nil? auto-run) true))
