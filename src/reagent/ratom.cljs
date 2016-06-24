@@ -85,6 +85,7 @@
   (when-some [rs (.-reactions this)]
     (let [a (coll-array rs)
           age (.-age this)]
+      ;; mark children as dirty first, so that _refresh always works
       (dotimes [i (alength a)] (._mark-dirty (aget a i) age))
       (when-not shallow
         (dotimes [i (alength a)] (._handle-change (aget a i)))))))
@@ -141,6 +142,7 @@
   Object
   (_add-reaction [this r]
     (when-not (identical? oldstate -no-value)
+      ;; oldstate can no longer be trusted
       (set! oldstate -unique-value))
     (add-r this r))
 
@@ -166,6 +168,7 @@
   (_refresh [a compare]
     (cond
       (>= compare age) false
+      ;; would flush trigger an update?
       (identical? oldstate -no-value) false
       (= oldstate state) (do (set! oldstate state) false)
       :else true))
@@ -474,12 +477,12 @@
       (._handle-result this (._unchecked-exec this f) nil true)
       (._run-reactive this)))
 
-  (_refresh-watching [this]
+  (_refresh-watching [this compare]
     (let [ks (map-key-array watching)
           len (alength ks)]
       (loop [i 0]
         (when (< i len)
-          (if ^boolean (._refresh (aget ks i) age)
+          (if ^boolean (._refresh (aget ks i) compare)
             (set! age -1)
             (when-not (neg? age) ; did parent mark us dirty?
               (recur (inc i))))))
@@ -487,11 +490,12 @@
 
   (_refresh [this _]
     (let [gen (atom-generation)
+          a age
           dirty (cond
-                  (>= age gen) false
-                  (neg? age) true
+                  (>= a gen) false
+                  (neg? a) true
                   (nil? watching) true
-                  :else ^boolean (._refresh-watching this))]
+                  :else ^boolean (._refresh-watching this a))]
       (if dirty
         (._run this)
         (set! age gen))
