@@ -419,3 +419,127 @@
 
     (is (= @res (f3)))
     (is (= @count 4))))
+
+(deftest multi-depend-2
+  (let [runs (running)
+        a0 (r/atom 1)
+        a1 (r/atom 10)
+        atoms [a0 a1]
+        funs (atom {})
+        nexe (atom {})
+        a (fn [n] @(atoms n))
+        t (fn [n] (if rv/*ratom-context*
+                    @(r/track (@funs n))
+                    ((@funs n))))
+        fundef {0 #(+ (a 0))
+                1 #(+ (a 1))
+                2 #(+ 2 (t 0) (t 1))
+                3 #(if (== (mod (a 1) 2) 0) (a 0) (a 1))
+                4 #(quot (t 1) 2)
+                5 #(+ 5 (if (== (mod (t 2) 2) 0) (t 3) (t 4)))
+                6 #(+ 6 (t 0) (t 1) (t 7) (a 0) (t 5) (t 4) (t 3))
+                7 #(if (== (mod (t 4) 2) 0) (t 1) (t 5))
+                8 #(+ 8 (t 0) (t 2) (t 3) (t 2) (t 3) (t 5) (t 6) (t 7))
+                9 #(+ 9 (a 0) (t 0) (t 2) (t 4) (t 8))
+                10 #(+ 10 (a 0) (a 1) (t 6) (t 0) (t 2) (t 4) (t 5) (t 9))
+                11 #(+ 11 (a 1))
+                12 #(+ 12 (t 11))
+                13 #(+ 13 (t 12))
+                14 #(+ 14 (t 13))
+                15 #(+ 15 (t 14) (t 10))
+                16 #(+ 16 (t 15) (a 0) (a 1))}
+        _ (reset! funs (reduce-kv
+                        (fn [m k v]
+                          (assoc m k
+                                 (fn []
+                                   (let [res (v)]
+                                     (when rv/*ratom-context*
+                                       (swap! nexe update-in [k] inc))
+                                     res))))
+                        {} fundef))
+        fnum (count fundef)
+        exe (fn [n track?]
+              (if track?
+                (binding [rv/*ratom-context* nil]
+                  (t n))
+                (t n)))
+        checkn (fn [n]
+                 (let [v1 (exe n true)
+                       v2 (exe n false)]
+                   (is (= v1 v2))))
+        reset-count (fn [] (reset! nexe {}))
+        all (r/track! (fn []
+                        (assert rv/*ratom-context*)
+                        (doseq [i (->> fnum range shuffle (drop 2))]
+                          (checkn i))
+                        (is (= #{1} (-> @nexe vals set)))))]
+    (dotimes [_ testite]
+      (reset-count)
+      (swap! a0 inc)
+      (rv/flush!)
+
+      (reset-count)
+      (swap! a1 inc)
+      (rv/flush!)
+      (is (= ((@funs 0)) @a0))
+      (is (= @(r/track (@funs 0)) @a0))
+
+      (reset-count)
+      (swap! a0 inc)
+      (swap! a1 inc)
+      (rv/flush!)
+
+      (reset-count)
+      (reset! a0 @a0)
+      (reset! a1 @a1)
+      (rv/flush!)
+      (is (= @nexe {}))
+
+      (reset-count)
+      (let [o0 @a0
+            o1 @a1]
+        (reset! a0 12345)
+        (reset! a1 54321)
+        (reset! a0 o0)
+        (reset! a1 o1)
+        (is (= @nexe {}))
+        (rv/flush!)
+        (is (= @nexe {})))
+
+      (reset-count)
+      (swap! a1 inc)
+      @all
+      (is (= ((@funs 1)) @a1))
+      (is (= @(r/track (@funs 1)) @a1))
+
+      (reset-count)
+      (swap! a0 inc)
+      @all
+
+      (reset-count)
+      (swap! a1 inc)
+      (swap! a0 inc)
+      @all
+
+      (reset-count)
+      (let [o0 @a0
+            o1 @a1]
+        (rv/flush!)
+        (is (= @nexe {}))
+        (reset! a0 12345)
+        (reset! a1 54321)
+        (reset! a0 o0)
+        (reset! a1 o1)
+        (is (= @nexe {}))
+        @all
+        (is (= @nexe {})))
+
+      (doseq [i (-> fnum range shuffle)]
+        (checkn i)))
+
+    (r/dispose! all)
+    (is (= runs (running)))))
+
+(deftest repeat-depend-multi
+  (dotimes [_ 2]
+    (multi-depend-2)))
