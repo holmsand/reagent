@@ -368,7 +368,7 @@
   (run [this]))
 
 (def recursion-error "Recursion in Reaction not allowed")
-(def updating -2 #_ (dec (js/Math.pow 2 53))) ; max int
+(def updating -2)
 
 (deftype ReactionEx [error])
 
