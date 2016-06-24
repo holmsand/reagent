@@ -22,7 +22,7 @@
 
 (declare ^:dynamic *-captured*)
 
-(defn- deref-capture [r f ^boolean update ^boolean check]
+(defn- deref-capture [r f ^boolean update ^boolean check shallow]
   (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
   (binding [*ratom-context* r
             *-captured* {}]
@@ -30,7 +30,7 @@
                 (._try-exec r f)
                 (._unchecked-exec r f))]
       (if update
-        (._handle-result r res *-captured*)
+        (._handle-result r res *-captured* shallow)
         [res *-captured*]))))
 
 (defn- notify-deref-watcher! [derefed]
@@ -81,11 +81,13 @@
         w' (when (-> w' count pos?) w')]
     (set! (.-reactions this) (check-watches w w'))))
 
-(defn- notify-r [this]
+(defn- notify-r [this ^boolean shallow]
   (when-some [rs (.-reactions this)]
-    (let [a (coll-array rs)]
-      (dotimes [i (alength a)] (._mark-dirty (aget a i) (.-age this)))
-      (dotimes [i (alength a)] (._handle-change (aget a i))))))
+    (let [a (coll-array rs)
+          age (.-age this)]
+      (dotimes [i (alength a)] (._mark-dirty (aget a i) age))
+      (when-not shallow
+        (dotimes [i (alength a)] (._handle-change (aget a i)))))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -157,7 +159,7 @@
     (try
       (when (not= oldstate state)
         (set! oldstate -no-value)
-        (notify-r a))
+        (notify-r a false))
       (finally
         (set! oldstate -no-value))))
 
@@ -418,7 +420,7 @@
   (_handle-change [this]
     (when (and (== age -1) (some? watching))
       (if (or (nil? auto-run) (true? auto-run))
-        (._run-reactive this)
+        (deref-capture this f true (nil? auto-run) false)
         (auto-run this))))
 
   (_update-watching [this derefed]
@@ -446,53 +448,53 @@
              (->ReactionEx e))
            (finally (set! age gen)))))
 
-  (_maybe-notify [this old new]
+  (_maybe-notify [this old new shallow]
     (when-not (or (and (nil? reactions) (nil? watches))
                   (= old new))
       (notify-w this old new)
-      (notify-r this)))
+      (notify-r this shallow)))
 
-  (_handle-result [this res derefed]
-    (let [old state]
-      (when-not (identical? old -no-value)
+  (_handle-result [this res derefed shallow]
+    (let [old state
+          caching (not (identical? old -no-value))]
+      (when caching
         (set! state res))
-      (when (and (some? derefed)
-                 (not= derefed watching))
+      (when-not (or (nil? derefed)
+                    (= derefed watching))
         (._update-watching this derefed))
-      (._maybe-notify this old res))
+      (when caching
+        (._maybe-notify this old res shallow)))
     res)
 
   (_run-reactive [this]
-    (deref-capture this f true (nil? auto-run)))
+    (deref-capture this f true (nil? auto-run) true))
 
   (_run [this]
-    (if (and (nil? *ratom-context*) (nil? auto-run))
-      (._handle-result this (._unchecked-exec this f) nil)
+    (if (and (nil? *ratom-context*) (nil? auto-run) (nil? watching))
+      (._handle-result this (._unchecked-exec this f) nil true)
       (._run-reactive this)))
 
   (_refresh-watching [this]
     (let [ks (map-key-array watching)
-          len (alength ks)
-          a age]
+          len (alength ks)]
       (loop [i 0]
         (when (< i len)
-          (if ^boolean (._refresh (aget ks i) a)
-            (._run-reactive this)
-            (when (== a (.-age this))
-              (recur (inc i)))))))
-    false)
+          (if ^boolean (._refresh (aget ks i) age)
+            (set! age -1)
+            (when-not (neg? age) ; did parent mark us dirty?
+              (recur (inc i))))))
+      (neg? age)))
 
-  (_refresh [this compare]
-    (let [dirty (cond
-                  (and (not (== compare -1))
-                       (nil? reactions)) false
-                  (>= age (atom-generation)) false
+  (_refresh [this _]
+    (let [gen (atom-generation)
+          dirty (cond
+                  (>= age gen) false
                   (neg? age) true
                   (nil? watching) true
                   :else ^boolean (._refresh-watching this))]
       (if dirty
         (._run this)
-        (set! age (atom-generation)))
+        (set! age gen))
       false))
 
   (_set-opts [this {:keys [auto-run on-set on-dispose no-cache]}]
@@ -507,9 +509,9 @@
 
   IDeref
   (-deref [this]
+    (notify-deref-watcher! this)
     (when (instance? ReactionEx state) (throw (.-error state)))
     (when (== age dont-update) (throw (js/Error. recursion-error)))
-    (notify-deref-watcher! this)
     (._refresh this -1)
     state)
 
@@ -558,7 +560,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture r f true false)]
+        res (deref-capture r f true false true)]
     (when (-> r .-watching count pos?)
       (set! temp-reaction (make-reaction (fn [])))
       (._set-opts r opts)
@@ -570,7 +572,7 @@
 (def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
-  (let [[res captured] (deref-capture check-reaction f false false)]
+  (let [[res captured] (deref-capture check-reaction f false false true)]
     [res (-> captured count pos?)]))
 
 
