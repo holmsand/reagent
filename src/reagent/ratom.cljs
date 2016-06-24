@@ -374,7 +374,7 @@
   (run [this]))
 
 (def recursion-error "Recursion in Reaction not allowed")
-(def dont-update (dec (js/Math.pow 2 53))) ; max int
+(def updating -2 #_ (dec (js/Math.pow 2 53))) ; max int
 
 (deftype ReactionEx [error])
 
@@ -436,20 +436,20 @@
         (._remove-reaction w this))))
 
   (_unchecked-exec [this f]
-    (set! age dont-update)
-    (let [gen (atom-generation)]
-      (try (f)
-           (finally (set! age gen)))))
+    (set! age updating)
+    (let [gen (atom-generation)
+          res (f)]
+      (set! age gen)
+      res))
 
   (_try-exec [this f]
-    (set! age dont-update)
-    (let [gen (atom-generation)]
-      (try (f)
-           (catch :default e
-             (when (= recursion-error (.-message e)) (throw e))
-             (error "Error in Reaction: " e)
-             (->ReactionEx e))
-           (finally (set! age gen)))))
+    (try
+      (._unchecked-exec this f)
+      (catch :default e
+        (when (= recursion-error (.-message e)) (throw e))
+        (set! age (atom-generation))
+        (error "Error in Reaction: " e)
+        (->ReactionEx e))))
 
   (_maybe-notify [this old new shallow]
     (when-not (or (and (nil? reactions) (nil? watches))
@@ -515,7 +515,7 @@
   (-deref [this]
     (notify-deref-watcher! this)
     (when (instance? ReactionEx state) (throw (.-error state)))
-    (when (== age dont-update) (throw (js/Error. recursion-error)))
+    (when (== age updating) (throw (js/Error. recursion-error)))
     (._refresh this -1)
     state)
 
@@ -653,6 +653,7 @@
         @res
         (time (dotimes [x nite]
                 (swap! a inc)
+                ;; @res #_
                 (flush!)))
         (dispose! res))))
   (ratom-perf))
