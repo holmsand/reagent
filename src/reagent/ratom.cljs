@@ -22,11 +22,6 @@
 
 (declare ^:dynamic *-captured*)
 
-(defn- deref-capture [r f update check shallow]
-  (binding [*ratom-context* r
-            *-captured* {}]
-    (._captured-exec r f update check shallow)))
-
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
     (set! *-captured* (assoc *-captured* derefed nil))))
@@ -417,7 +412,7 @@
   (_handle-change [this]
     (when (and (== age -1) (some? watching))
       (if (or (nil? auto-run) (true? auto-run))
-        (deref-capture this f true (nil? auto-run) false)
+        (._deref-capture this f true (nil? auto-run) false)
         (auto-run this))))
 
   (_update-watching [this derefed]
@@ -471,13 +466,18 @@
         (._handle-result r res *-captured* shallow)
         [res *-captured*])))
 
+  (_deref-capture [r f update check shallow]
+    (binding [*ratom-context* r
+              *-captured* {}]
+      (._captured-exec r f update check shallow)))
+
   (_run-reactive [this]
-    (deref-capture this f true false true))
+    (._deref-capture this f true false true))
 
   (_run-refresh [this check]
     (if (and (nil? watching) (nil? *ratom-context*) (nil? auto-run))
       (._handle-result this (._unchecked-exec this f (atom-generation)) nil true)
-      (deref-capture this f true check true)))
+      (._deref-capture this f true check true)))
 
   (_refresh-watching [this compare]
     (let [ks (map-key-array watching)
@@ -566,8 +566,9 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture r f true false true)]
-    (when (-> r .-watching count pos?)
+        res (._deref-capture r f true false true)]
+    (when-not (identical? (.-watching r) {})
+      (assert (-> r .-watching count pos?))
       (set! temp-reaction (make-reaction (fn [])))
       (._set-opts r opts)
       (set! (.-f r) f)
@@ -578,7 +579,7 @@
 (def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
-  (let [[res captured] (deref-capture check-reaction f false false true)]
+  (let [[res captured] (._deref-capture check-reaction f false false true)]
     [res (-> captured count pos?)]))
 
 
