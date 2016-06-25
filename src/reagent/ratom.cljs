@@ -562,14 +562,21 @@
     r))
 
 
-(def ^:private temp-reaction (make-reaction (fn [])))
+(def ^:private temp-reaction nil)
+
+(defn- reset-temp-reaction []
+  (set! temp-reaction (make-reaction (fn [])))
+  (._set-opts temp-reaction {:no-cache true}))
+
+(reset-temp-reaction)
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (._deref-capture r f true false true)]
     (when-not (identical? (.-watching r) {})
+      (reset-temp-reaction)
       (assert (-> r .-watching count pos?))
-      (set! temp-reaction (make-reaction (fn [])))
+      (set! (.-state r) nil)
       (._set-opts r opts)
       (set! (.-f r) f)
       (set! (.-auto-run r) #(run obj))
