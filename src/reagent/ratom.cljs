@@ -429,19 +429,18 @@
       (doseq [w (s/difference old new)]
         (._remove-reaction w this))))
 
-  (_unchecked-exec [this f]
+  (_unchecked-exec [this f gen]
     (set! age updating)
-    (let [gen (atom-generation)
-          res (f)]
+    (let [res (f)]
       (set! age gen)
       res))
 
-  (_try-exec [this f]
+  (_try-exec [this f gen]
     (try
-      (._unchecked-exec this f)
+      (._unchecked-exec this f gen)
       (catch :default e
+        (set! age gen)
         (when (= recursion-error (.-message e)) (throw e))
-        (set! age (atom-generation))
         (error "Error in Reaction: " e)
         (->ReactionEx e))))
 
@@ -466,19 +465,19 @@
   (_captured-exec [r f ^boolean update ^boolean check shallow]
     (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
     (let [res (if check
-                (._try-exec r f)
-                (._unchecked-exec r f))]
+                (._try-exec r f (atom-generation))
+                (._unchecked-exec r f (atom-generation)))]
       (if update
         (._handle-result r res *-captured* shallow)
         [res *-captured*])))
 
   (_run-reactive [this]
-    (deref-capture this f true (nil? auto-run) true))
+    (deref-capture this f true false true))
 
-  (_run [this]
-    (if (and (nil? *ratom-context*) (nil? auto-run) (nil? watching))
-      (._handle-result this (._unchecked-exec this f) nil true)
-      (._run-reactive this)))
+  (_run-refresh [this check]
+    (if (and (nil? watching) (nil? *ratom-context*) (nil? auto-run))
+      (._handle-result this (._unchecked-exec this f (atom-generation)) nil true)
+      (deref-capture this f true check true)))
 
   (_refresh-watching [this compare]
     (let [ks (map-key-array watching)
@@ -491,7 +490,7 @@
               (recur (inc i))))))
       (neg? age)))
 
-  (_refresh [this _]
+  (_refresh [this compare]
     (let [gen (atom-generation)
           a age
           dirty (cond
@@ -500,7 +499,7 @@
                   (nil? watching) true
                   :else ^boolean (._refresh-watching this a))]
       (if dirty
-        (._run this)
+        (._run-refresh this (not (== compare -1)))
         (set! age gen))
       false))
 
