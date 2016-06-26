@@ -3,9 +3,8 @@
   (:require [reagent.debug :refer-macros [dbg]]
             [reagent.interop :refer-macros [$ $!]]
             [reagent.impl.util :refer [is-client]]
-            [clojure.string :as string]))
-
-;;; Update batching
+            [clojure.string :as string])
+  (:import [goog.async.nextTick]))
 
 (defonce mount-count 0)
 
@@ -29,7 +28,7 @@
   (- ($ c1 :cljsMountOrder)
      ($ c2 :cljsMountOrder)))
 
-(defn run-queue [a]
+(defn update-components [a]
   ;; sort components by mount order, to make sure parents
   ;; are rendered before children
   (.sort a compare-mount-order)
@@ -42,8 +41,12 @@
 ;; Set from ratom.cljs
 (defonce ratom-flush (fn []))
 
+(defn set-immediate [f]
+  ;; Like (js/setTimeout f 0), but without the delay
+  (goog.async.nextTick f))
+
 (deftype RenderQueue [^:mutable ^boolean scheduled?
-                      ^:mutable ^boolean running]
+                      ^:mutable ^boolean waiting]
   Object
   (enqueue [this k f]
     (assert (some? f))
@@ -61,8 +64,11 @@
   (schedule [this]
     (when-not scheduled?
       (set! scheduled? true)
-      (when-not running
-        (next-tick #(.run-queues this)))))
+      (when-not waiting
+        (set! waiting true)
+        ;; Don't use raf on first schedule, to avoid Safari delay
+        (set-immediate #(.run-queues this))))
+    nil)
 
   (queue-render [this c]
     (.enqueue this "componentQueue" c))
@@ -74,19 +80,17 @@
     (.enqueue this "afterRender" f))
 
   (run-queues [this]
-    (set! running true)
-    (set! scheduled? false)
     (try
       (.flush-queues this)
-      (set! running false)
+      (set! waiting false)
       (finally
-        (when running
-          (set! running false)
+        (when waiting
+          (set! waiting false)
           (set! scheduled? false))))
-    (when scheduled?
-      ;; Use setTimeout to allow the browser to catch up and handle events.
-      (js/setTimeout (fn [] (next-tick #(.run-queues this)))
-                     0)))
+    (when (set! waiting scheduled?)
+      (set! scheduled? false)
+      ;; Wrap call to raf to allow browser time to process events
+      (set-immediate (fn [] (next-tick #(.run-queues this))))))
 
   (flush-after-render [this]
     (.run-funs this "afterRender"))
@@ -96,7 +100,7 @@
     (ratom-flush)
     (when-some [cs (aget this "componentQueue")]
       (aset this "componentQueue" nil)
-      (run-queue cs))
+      (update-components cs))
     (.flush-after-render this)))
 
 (def render-queue (->RenderQueue false false))
@@ -122,5 +126,4 @@
   (.add-after-render render-queue f))
 
 (defn schedule []
-  (when-not ^boolean (.-scheduled? render-queue)
-    (.schedule render-queue)))
+  (.schedule render-queue))
