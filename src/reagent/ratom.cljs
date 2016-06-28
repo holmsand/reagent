@@ -416,9 +416,10 @@
 
   (_handle-change [this]
     (when (and (== age -1) (not (nil? watching)))
-      (if (or (nil? auto-run) (true? auto-run))
-        (._deref-capture this f true (nil? auto-run) false)
-        (auto-run this))))
+      (let [ar auto-run]
+        (if (or (nil? ar) (true? ar))
+          (._deref-capture this f true (nil? ar) false)
+          (ar this)))))
 
   (_update-watching [this derefed]
     (let [new (-> derefed vals set)
