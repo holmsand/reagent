@@ -9,6 +9,7 @@
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
 (defonce ^:private ^number generation 1)
+(defonce ^:private ^number nratoms 1)
 (defonce ^:private ^number with-let-gen 1)
 (defonce ^:private ^number -nwatches 0)
 
@@ -18,13 +19,16 @@
 
 ;;; Utilities
 
+(defn next-rid []
+  (set! nratoms (inc nratoms)))
+
 (defn running [] -nwatches)
 
 (declare ^:dynamic *-captured*)
 
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
-    (set! *-captured* (assoc *-captured* derefed nil))))
+    (set! *-captured* (assoc *-captured* (.-rid derefed) derefed))))
 
 (defn- add-w [this key f]
   (set! (.-watches this) (assoc (.-watches this) key f)))
@@ -52,13 +56,13 @@
       (set! (.-ratomCollArray c)
             (into-array (if debug (shuffle c) c))))))
 
-(defn- map-key-array [m]
+(defn- map-val-array [m]
   (if (-> m count zero?)
     -empty-array
-    (if-some [a (.-ratomMapKeyArray m)]
+    (if-some [a (.-ratomMapValArray m)]
       a
-      (set! (.-ratomMapKeyArray m)
-            (into-array (if debug (shuffle (keys m)) (keys m)))))))
+      (set! (.-ratomMapValArray m)
+            (into-array (if debug (shuffle (vals m)) (vals m)))))))
 
 (defn- add-r [this r]
   (let [w (or (.-reactions this) #{})]
@@ -116,7 +120,7 @@
 
 
 (deftype RAtom [^:mutable state meta validator ^:mutable watches
-                ^:mutable oldstate ^:mutable ^number age]
+                ^:mutable oldstate ^:mutable ^number age rid]
   IAtom
   IReactiveAtom
 
@@ -191,12 +195,13 @@
   (-remove-watch [this key]       (remove-w this key))
 
   IHash
-  (-hash [this] (goog/getUid this)))
+  (-hash [this] rid))
 
 (defn atom
   "Like clojure.core/atom, except that it keeps track of derefs."
-  ([x] (->RAtom x nil nil nil -no-value -1))
-  ([x & {:keys [meta validator]}] (->RAtom x meta validator nil -no-value -1)))
+  ([x] (->RAtom x nil nil nil -no-value -1 (next-rid)))
+  ([x & {:keys [meta validator]}] (->RAtom x meta validator nil -no-value -1
+                                           (next-rid))))
 
 
 ;;; track
@@ -368,7 +373,7 @@
 (deftype ReactionEx [error])
 
 (deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
-                   ^:mutable ^number age
+                   ^:mutable ^number age rid
                    ^:mutable reactions ^:mutable watches ^:mutable watching]
   IAtom
   IReactiveAtom
@@ -410,14 +415,14 @@
       (set! age -1)))
 
   (_handle-change [this]
-    (when (and (== age -1) (some? watching))
+    (when (and (== age -1) (not (nil? watching)))
       (if (or (nil? auto-run) (true? auto-run))
         (._deref-capture this f true (nil? auto-run) false)
         (auto-run this))))
 
   (_update-watching [this derefed]
-    (let [new (-> derefed keys set)
-          old (-> watching keys set)]
+    (let [new (-> derefed vals set)
+          old (-> watching vals set)]
       (set! watching derefed)
       (doseq [w (s/difference new old)]
         (._add-reaction w this))
@@ -480,7 +485,7 @@
       (._deref-capture this f true check true)))
 
   (_refresh-watching [this compare]
-    (let [ks (map-key-array watching)
+    (let [ks (map-val-array watching)
           len (alength ks)]
       (loop [i 0]
         (when (< i len)
@@ -524,7 +529,7 @@
   IDisposable
   (dispose! [this]
     (let [s state]
-      (doseq [w (keys watching)]
+      (doseq [w (vals watching)]
         (._remove-reaction w this))
       (set! watching nil)
       (set! state nil)
@@ -548,7 +553,7 @@
   (-pr-writer [a w opts] (pr-atom a w opts (str "Reaction " (hash a) ":")))
 
   IHash
-  (-hash [this] (goog/getUid this)))
+  (-hash [this] rid))
 
 (defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
   {:pre [(ifn? f)
@@ -557,7 +562,7 @@
          (or (nil? on-dispose) (fn? on-dispose))]}
   (let [ar (if (false? auto-run) nil auto-run)
         od (and on-dispose (array on-dispose))
-        r (->Reaction f nil ar od -1 nil nil nil)]
+        r (->Reaction f nil ar od -1 (next-rid) nil nil nil)]
     (when on-set (._set-opts r {:on-set on-set}))
     r))
 

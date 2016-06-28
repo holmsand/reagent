@@ -4,7 +4,7 @@
             [reagent.interop :refer-macros [$ $!]]
             [reagent.impl.util :refer [is-client]]
             [clojure.string :as string])
-  (:import [goog.async.nextTick]))
+  (:import [goog.async nextTick]))
 
 (defonce mount-count 0)
 
@@ -43,7 +43,7 @@
 
 (defn set-immediate [f]
   ;; Like (js/setTimeout f 0), but without the delay
-  (goog.async.nextTick f))
+  (nextTick f))
 
 (deftype RenderQueue [^:mutable ^boolean scheduled?
                       ^:mutable ^boolean waiting]
