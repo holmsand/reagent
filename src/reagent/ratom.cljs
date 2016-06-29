@@ -9,6 +9,7 @@
 (declare ^:dynamic *ratom-context*)
 (defonce ^boolean debug false)
 (defonce ^:private ^number generation 1)
+(defonce ^:private ^number flush-generation -1)
 (defonce ^:private ^number nratoms 1)
 (defonce ^:private ^number with-let-gen 1)
 (defonce ^:private ^number -nwatches 0)
@@ -52,6 +53,24 @@
       a)))
 
 (declare ^:dynamic *-captured*)
+
+(defn- ^number atom-generation []
+  (if (== flush-generation -1) generation flush-generation))
+
+(defn- captured-exec [r f ^boolean update ^boolean check shallow]
+  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
+  (let [res (if check
+              (._try-exec r f (atom-generation))
+              (._unchecked-exec r f (atom-generation)))]
+    (if update
+      (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
+                       shallow)
+      [res *-captured*])))
+
+(defn- deref-capture [r f update check shallow]
+  (binding [*ratom-context* r
+            *-captured* nil]
+    (captured-exec r f update check shallow)))
 
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
@@ -110,7 +129,6 @@
 ;;; Queueing
 
 (defonce ^:private ratom-queue nil)
-(defonce ^:private ^number flush-generation -1)
 (defonce ^:private -no-value #js {})
 (defonce ^:private -unique-value #js {})
 
@@ -125,9 +143,6 @@
 (defn flush! []
   (try (flush-atoms)
        (finally (set! flush-generation -1))))
-
-(defn- ^number atom-generation []
-  (if (== flush-generation -1) generation flush-generation))
 
 (set! batch/ratom-flush flush!)
 
@@ -436,7 +451,7 @@
     (when (and (== age -1) (not (nil? watching)))
       (let [ar auto-run]
         (if (or (nil? ar) (true? ar))
-          (._deref-capture this f true (nil? ar) false)
+          (deref-capture this f true (nil? ar) false)
           (ar this)))))
 
   (_update-watching [this derefed]
@@ -484,28 +499,13 @@
         (._maybe-notify this old res shallow)))
     res)
 
-  (_captured-exec [r f ^boolean update ^boolean check shallow]
-    (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
-    (let [res (if check
-                (._try-exec r f (atom-generation))
-                (._unchecked-exec r f (atom-generation)))]
-      (if update
-        (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
-                         shallow)
-        [res *-captured*])))
-
-  (_deref-capture [r f update check shallow]
-    (binding [*ratom-context* r
-              *-captured* nil]
-      (._captured-exec r f update check shallow)))
-
   (_run-reactive [this]
-    (._deref-capture this f true false true))
+    (deref-capture this f true false true))
 
   (_run-refresh [this check]
     (if (and (nil? watching) (nil? *ratom-context*) (nil? auto-run))
       (._handle-result this (._unchecked-exec this f (atom-generation)) nil true)
-      (._deref-capture this f true check true)))
+      (deref-capture this f true check true)))
 
   (_refresh-watching [this compare]
     (let [ks watching
@@ -600,7 +600,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (._deref-capture r f true false true)]
+        res (deref-capture r f true false true)]
     (when (-> r .-watching arr-len pos?)
       (reset-temp-reaction)
       (set! (.-state r) nil)
@@ -613,7 +613,7 @@
 (def ^:private check-reaction (make-reaction (fn [])))
 
 (defn check-derefs [f]
-  (let [[res captured] (._deref-capture check-reaction f false false true)]
+  (let [[res captured] (deref-capture check-reaction f false false true)]
     [res (-> captured some?)]))
 
 
