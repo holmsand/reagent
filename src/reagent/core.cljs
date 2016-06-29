@@ -347,7 +347,7 @@ used. This may be noticed with add-watch."
   "Works just like clojure.core/partial, except that it is an IFn, and
 the result can be compared with ="
   [f & args]
-  (util/partial-ifn. f args nil))
+  (util/->partial-ifn f args nil))
 
 (defn component-path
   ;; Try to return the path of component c as a string.

@@ -667,7 +667,7 @@
 
 (defn make-wrapper [value callback-fn args]
   (->Wrapper value
-             (util/partial-ifn. callback-fn args nil)
+             (util/->partial-ifn callback-fn args nil)
              false nil))
 
 

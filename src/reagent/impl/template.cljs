@@ -242,7 +242,7 @@
     ($ util/react createElement c jsprops)))
 
 (defn adapt-react-class [c]
-  (doto (NativeWrapper.)
+  (doto (->NativeWrapper)
     ($! :name c)
     ($! :id nil)
     ($! :class nil)))
