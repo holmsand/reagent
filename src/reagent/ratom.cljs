@@ -13,6 +13,7 @@
 (defonce ^:private ^number nratoms 1)
 (defonce ^:private ^number with-let-gen 1)
 (defonce ^:private ^number -nwatches 0)
+(def ^:private -empty-array (array))
 
 (defn ^boolean reactive? []
   (some? *ratom-context*))
@@ -25,8 +26,6 @@
 
 (defn running [] -nwatches)
 
-(def ^:private -empty-array (array))
-
 (defn- ^number arr-len [x]
   (if (nil? x) 0 (alength x)))
 
@@ -35,10 +34,10 @@
       (and (not (nil? x))
            (not (nil? y))
            (== (alength y) (alength x))
-           (loop [i 0 len (alength x)]
-             (or (== i len)
+           (loop [i 0]
+             (or (== i (alength x))
                  (if (identical? (aget x i) (aget y i))
-                   (recur (inc i) len)
+                   (recur (inc i))
                    false))))))
 
 (defn- ^boolean not-in-arr [a x]
@@ -49,7 +48,8 @@
   (if (nil? a)
     (array v)
     (do
-      (when (== -1 (.indexOf a v)) (.push a v))
+      (when (== -1 (.indexOf a v))
+        (.push a v))
       a)))
 
 (declare ^:dynamic *-captured*)
@@ -92,14 +92,11 @@
   (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
-(defn- set-array [c]
-  (if (or (nil? c)
-          (identical? c #{}))
-    -empty-array
-    (if-some [a (.-ratomSetArray c)]
-      a
-      (set! (.-ratomSetArray c)
-            (into-array (if debug (shuffle c) c))))))
+(defn- set->array [c]
+  (if-some [a (.-ratomSetArray c)]
+    a
+    (set! (.-ratomSetArray c)
+          (into-array (if debug (shuffle c) c)))))
 
 (defn- add-r [this r]
   (let [w (or (.-reactions this) #{})]
@@ -113,7 +110,7 @@
 
 (defn- notify-r [this ^boolean shallow]
   (when-some [rs (.-reactions this)]
-    (let [a (set-array rs)
+    (let [a (set->array rs)
           age (.-age this)]
       ;; mark children as dirty first, so that _refresh always works
       (dotimes [i (alength a)] (._mark-dirty (aget a i) age))
@@ -507,12 +504,12 @@
       (._handle-result this (._unchecked-exec this f (atom-generation)) nil true)
       (deref-capture this f true check true)))
 
-  (_refresh-watching [this compare]
+  (_refresh-watching [this]
     (let [ks watching
           len (alength ks)]
       (loop [i 0]
         (when (< i len)
-          (if ^boolean (._refresh (aget ks i) compare)
+          (if ^boolean (._refresh (aget ks i) age)
             (set! age -1)
             (when-not (neg? age) ; did parent mark us dirty?
               (recur (inc i))))))
@@ -525,7 +522,7 @@
                   (>= a gen) false
                   (neg? a) true
                   (nil? watching) true
-                  :else ^boolean (._refresh-watching this a))]
+                  :else ^boolean (._refresh-watching this))]
       (if dirty
         (._run-refresh this (not (== compare -1)))
         (set! age gen))
