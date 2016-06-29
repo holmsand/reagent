@@ -24,11 +24,38 @@
 
 (defn running [] -nwatches)
 
+(def ^:private -empty-array (array))
+
+(defn- ^number arr-len [x]
+  (if (nil? x) 0 (alength x)))
+
+(defn- ^boolean arr-eq [x y]
+  (or (identical? x y)
+      (and (not (nil? x))
+           (not (nil? y))
+           (== (alength y) (alength x))
+           (loop [i 0 len (alength x)]
+             (or (== i len)
+                 (if (identical? (aget x i) (aget y i))
+                   (recur (inc i) len)
+                   false))))))
+
+(defn- ^boolean not-in-arr [a x]
+  (or (nil? a)
+      (== -1 (.indexOf a x))))
+
+(defn- arr-add [a v]
+  (if (nil? a)
+    (array v)
+    (do
+      (when (== -1 (.indexOf a v)) (.push a v))
+      a)))
+
 (declare ^:dynamic *-captured*)
 
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
-    (set! *-captured* (assoc *-captured* (.-rid derefed) derefed))))
+    (set! *-captured* (arr-add *-captured* derefed))))
 
 (defn- add-w [this key f]
   (set! (.-watches this) (assoc (.-watches this) key f)))
@@ -46,8 +73,6 @@
   (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
-(def ^:private -empty-array (array))
-
 (defn- coll-array [c]
   (if (-> c count zero?)
     -empty-array
@@ -55,14 +80,6 @@
       a
       (set! (.-ratomCollArray c)
             (into-array (if debug (shuffle c) c))))))
-
-(defn- map-val-array [m]
-  (if (-> m count zero?)
-    -empty-array
-    (if-some [a (.-ratomMapValArray m)]
-      a
-      (set! (.-ratomMapValArray m)
-            (into-array (if debug (shuffle (vals m)) (vals m)))))))
 
 (defn- add-r [this r]
   (let [w (or (.-reactions this) #{})]
@@ -422,13 +439,17 @@
           (ar this)))))
 
   (_update-watching [this derefed]
-    (let [new (-> derefed vals set)
-          old (-> watching vals set)]
+    (let [new derefed
+          old watching]
       (set! watching derefed)
-      (doseq [w (s/difference new old)]
-        (._add-reaction w this))
-      (doseq [w (s/difference old new)]
-        (._remove-reaction w this))))
+      (dotimes [i (arr-len new)]
+        (let [r (aget new i)]
+          (when (not-in-arr old r)
+            (._add-reaction r this))))
+      (dotimes [i (arr-len old)]
+        (let [r (aget old i)]
+          (when (not-in-arr new r)
+            (._remove-reaction r this))))))
 
   (_unchecked-exec [this f gen]
     (set! age updating)
@@ -456,8 +477,7 @@
           caching (not (identical? old -no-value))]
       (when caching
         (set! state res))
-      (when-not (or (nil? derefed)
-                    (= derefed watching))
+      (when-not (arr-eq derefed watching)
         (._update-watching this derefed))
       (when caching
         (._maybe-notify this old res shallow)))
@@ -469,12 +489,13 @@
                 (._try-exec r f (atom-generation))
                 (._unchecked-exec r f (atom-generation)))]
       (if update
-        (._handle-result r res *-captured* shallow)
+        (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
+                         shallow)
         [res *-captured*])))
 
   (_deref-capture [r f update check shallow]
     (binding [*ratom-context* r
-              *-captured* {}]
+              *-captured* nil]
       (._captured-exec r f update check shallow)))
 
   (_run-reactive [this]
@@ -486,7 +507,7 @@
       (._deref-capture this f true check true)))
 
   (_refresh-watching [this compare]
-    (let [ks (map-val-array watching)
+    (let [ks watching
           len (alength ks)]
       (loop [i 0]
         (when (< i len)
@@ -530,7 +551,7 @@
   IDisposable
   (dispose! [this]
     (let [s state]
-      (doseq [w (vals watching)]
+      (doseq [w watching]
         (._remove-reaction w this))
       (set! watching nil)
       (set! state nil)
@@ -579,9 +600,8 @@
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
         res (._deref-capture r f true false true)]
-    (when-not (identical? (.-watching r) {})
+    (when (-> r .-watching arr-len pos?)
       (reset-temp-reaction)
-      (assert (-> r .-watching count pos?))
       (set! (.-state r) nil)
       (._set-opts r opts)
       (set! (.-f r) f)
@@ -593,7 +613,7 @@
 
 (defn check-derefs [f]
   (let [[res captured] (._deref-capture check-reaction f false false true)]
-    [res (-> captured count pos?)]))
+    [res (-> captured some?)]))
 
 
 ;;; wrap
