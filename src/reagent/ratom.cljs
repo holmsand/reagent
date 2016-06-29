@@ -73,12 +73,13 @@
   (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
-(defn- coll-array [c]
-  (if (-> c count zero?)
+(defn- set-array [c]
+  (if (or (nil? c)
+          (identical? c #{}))
     -empty-array
-    (if-some [a (.-ratomCollArray c)]
+    (if-some [a (.-ratomSetArray c)]
       a
-      (set! (.-ratomCollArray c)
+      (set! (.-ratomSetArray c)
             (into-array (if debug (shuffle c) c))))))
 
 (defn- add-r [this r]
@@ -93,7 +94,7 @@
 
 (defn- notify-r [this ^boolean shallow]
   (when-some [rs (.-reactions this)]
-    (let [a (coll-array rs)
+    (let [a (set-array rs)
           age (.-age this)]
       ;; mark children as dirty first, so that _refresh always works
       (dotimes [i (alength a)] (._mark-dirty (aget a i) age))
