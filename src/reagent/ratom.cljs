@@ -54,24 +54,6 @@
 
 (declare ^:dynamic *-captured*)
 
-(defn- ^number atom-generation []
-  (if (== flush-generation -1) generation flush-generation))
-
-(defn- captured-exec [r f ^boolean update ^boolean check shallow]
-  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
-  (let [res (if check
-              (._try-exec r f (atom-generation))
-              (._unchecked-exec r f (atom-generation)))]
-    (if update
-      (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
-                       shallow)
-      [res *-captured*])))
-
-(defn- deref-capture [r f update check shallow]
-  (binding [*ratom-context* r
-            *-captured* nil]
-    (captured-exec r f update check shallow)))
-
 (defn- notify-deref-watcher! [derefed]
   (when-not (nil? *ratom-context*)
     (set! *-captured* (arr-add *-captured* derefed))))
@@ -147,7 +129,6 @@
 ;;; Atom
 
 (defprotocol IReactiveAtom)
-
 
 (deftype RAtom [^:mutable state meta validator ^:mutable watches
                 ^:mutable oldstate ^:mutable ^number age rid]
@@ -302,6 +283,7 @@
   {:pre [(ifn? f)]}
   (make-track! f args))
 
+
 ;;; cursor
 
 (deftype RCursor [ratom path ^:mutable reaction
@@ -402,6 +384,25 @@
 
 (deftype ReactionEx [error])
 
+(defn- ^number atom-generation []
+  (if (== flush-generation -1) generation flush-generation))
+
+(defn- captured-exec [r f ^boolean update ^boolean check shallow]
+  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
+  (let [res (if check
+              (._try-exec r f (atom-generation))
+              (._unchecked-exec r f (atom-generation)))]
+    (if update
+      (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
+                       shallow)
+      [res *-captured*])))
+
+(defn- deref-capture [r f update check shallow]
+  (binding [*ratom-context* r
+            *-captured* nil]
+    (captured-exec r f update check shallow)))
+
+
 (deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
                    ^:mutable ^number age rid
                    ^:mutable reactions ^:mutable watches ^:mutable watching]
@@ -475,15 +476,16 @@
       (._unchecked-exec this f gen)
       (catch :default e
         (set! age gen)
-        (when (= recursion-error (.-message e)) (throw e))
+        (when (= recursion-error (.-message e))
+          (throw e))
         (error "Error in Reaction: " e)
         (->ReactionEx e))))
 
   (_maybe-notify [this old new shallow]
     (when-not (or (and (nil? reactions) (nil? watches))
                   (= old new))
-      (notify-w this old new)
-      (notify-r this shallow)))
+      (notify-r this shallow)
+      (notify-w this old new)))
 
   (_handle-result [this res derefed shallow]
     (let [old state
