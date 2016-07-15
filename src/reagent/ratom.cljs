@@ -393,6 +393,8 @@
                    (not (vector? src))))
           (str "src must be a reactive atom or a function, not "
                (pr-str src)))
+  (assert (vector? path) (str "path must be a vector, not "
+                              (pr-str path)))
   (if (and (not (satisfies? IReactiveAtom src))
            (satisfies? IAtom src))
     (->RCursor native-cursor [src path] nil nil nil)
