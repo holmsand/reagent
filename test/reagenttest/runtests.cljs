@@ -1,6 +1,7 @@
 (ns reagenttest.runtests
   (:require [reagenttest.testreagent]
             [reagenttest.testcursor]
+            [reagenttest.testcursornative]
             [reagenttest.testinterop]
             [reagenttest.testratom]
             [reagenttest.testratomasync]
@@ -21,7 +22,7 @@
                      :color :#aaa})
 
 (defn all-tests []
-  #_(test/run-tests 'reagenttest.testratomasync)
+  #_(test/run-tests 'reagenttest.testcursornative)
   (test/run-all-tests #"reagenttest.test.*"))
 
 (defmethod test/report [::test/default :summary] [m]

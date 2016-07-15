@@ -74,6 +74,9 @@
   (when debug (set! -nwatches (+ -nwatches (- (count new) (count old)))))
   new)
 
+(defn- inc-watches [n]
+  (when debug (set! -nwatches (+ n -nwatches))))
+
 (defn- set->array [c]
   (if-some [a (.-ratomSetArray c)]
     a
@@ -236,8 +239,7 @@
       (nil? *ratom-context*) (f)
       :else (let [r (make-reaction
                       f :on-dispose (fn [r s]
-                                      (when debug
-                                        (set! -nwatches (dec -nwatches)))
+                                      (when debug (inc-watches -1))
                                       (as-> (aget o cache-key) _
                                         (dissoc _ k)
                                         (aset o cache-key _))
@@ -248,8 +250,7 @@
                   v (-deref r)]
               (aset o cache-key (-> (if (nil? m) {} m)
                                     (assoc k r)))
-              (when debug
-                (set! -nwatches (inc -nwatches)))
+              (when debug (inc-watches 1))
               (when (some? obj)
                 (set! (.-reaction obj) r))
               v))))
@@ -293,7 +294,25 @@
   (make-track! f args))
 
 
+;;; with-let support
+
+(defn with-let-destroy [v]
+  (when-some [f (.-destroy v)]
+    (f)))
+
+(defn with-let-values [key]
+  (if-some [c *ratom-context*]
+    (cached-reaction array c key
+                     nil with-let-destroy)
+    (array)))
+
+
 ;;; cursor
+
+(defn- swap-in! [a path new-value]
+  (if (= [] path)
+    (reset! a new-value)
+    (swap! a assoc-in path new-value)))
 
 (deftype RCursor [ratom path ^:mutable reaction
                   ^:mutable state ^:mutable watches]
@@ -333,9 +352,7 @@
     (let [oldstate state]
       (._set-state this oldstate new-value)
       (if (satisfies? IDeref ratom)
-        (if (= path [])
-          (reset! ratom new-value)
-          (swap! ratom assoc-in path new-value))
+        (swap-in! ratom path new-value)
         (ratom path new-value))
       new-value))
 
@@ -356,27 +373,30 @@
   IHash
   (-hash [_] (hash [ratom path])))
 
+(defn- native-cursor
+  ([[orig path]]
+   (with-let [a (atom @orig)
+              key [path orig :native]
+              _ (do (add-watch orig key #(reset! a %4))
+                    (when debug (inc-watches 1)))]
+     (get-in @a path)
+     (finally
+       (remove-watch orig key)
+       (when debug (inc-watches -1)))))
+  ([[orig path] new-value]
+   (swap-in! orig path new-value)))
+
 (defn cursor
   [src path]
-  (assert (or (satisfies? IReactiveAtom src)
+  (assert (or (satisfies? IAtom src)
               (and (ifn? src)
                    (not (vector? src))))
           (str "src must be a reactive atom or a function, not "
                (pr-str src)))
-  (->RCursor src path nil nil nil))
-
-
-;;; with-let support
-
-(defn with-let-destroy [v]
-  (when-some [f (.-destroy v)]
-    (f)))
-
-(defn with-let-values [key]
-  (if-some [c *ratom-context*]
-    (cached-reaction array c key
-                     nil with-let-destroy)
-    (array)))
+  (if (and (not (satisfies? IReactiveAtom src))
+           (satisfies? IAtom src))
+    (->RCursor native-cursor [src path] nil nil nil)
+    (->RCursor src path nil nil nil)))
 
 
 ;;;; reaction

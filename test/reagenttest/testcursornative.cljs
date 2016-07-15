@@ -1,4 +1,4 @@
-(ns reagenttest.testcursor
+(ns reagenttest.testcursornative
   (:require [cljs.test :as t :refer-macros [is deftest testing]]
             [reagent.ratom :as rv :refer-macros [run! reaction]]
             [reagent.debug :refer-macros [dbg]]
@@ -23,18 +23,18 @@
 
 (deftest basic-cursor
   (let [runs (running)
-        start-base (rv/atom {:a {:b {:c 0}}})
+        start-base (atom {:a {:b {:c 0}}})
         start (r/cursor start-base [:a :b :c])
         sv (reaction @start)
         comp (reaction @sv (+ 2 @sv))
         c2 (reaction (inc @comp))
-        count (rv/atom 0)
-        out (rv/atom 0)
+        count (atom 0)
+        out (atom 0)
         res (reaction
-             (swap! count inc)
-             @sv @c2 @comp)
+              (swap! count inc)
+              @sv @c2 @comp)
         const (run!
-               (reset! out @res))]
+                (reset! out @res))]
     (r/flush)
     (is (= @count 1) "constrain ran")
     (is (= @out 2))
@@ -48,16 +48,17 @@
 
 (deftest double-dependency
   (let [runs (running)
-        start-base (rv/atom {:a {:b {:c 0}}})
+        start-base (atom {:a {:b {:c 0}}})
         start (r/cursor start-base [:a :b :c])
-        c3-count (rv/atom 0)
-        c1 (reaction @start 1)
-        c2 (reaction @start)
+        curs (fn [] (r/cursor start-base [:a :b :c]))
+        c3-count (atom 0)
+        c1 (reaction @(curs) 1)
+        c2 (reaction @(curs))
         c3 (rv/make-reaction
-            (fn []
-              (swap! c3-count inc)
-              (+ @c1 @c2))
-            :auto-run true)]
+             (fn []
+               (swap! c3-count inc)
+               (+ @c1 @c2))
+             :auto-run true)]
     (r/flush)
     (is (= @c3-count 0))
     (is (= @c3 1))
@@ -73,14 +74,15 @@
 
 (deftest test-from-reflex
   (let [runs (running)]
-    (let [!ctr-base (rv/atom {:x {:y 0 :z 0}})
+    (let [!ctr-base (atom {:x {:y 0 :z 0}})
           !counter (r/cursor !ctr-base [:x :y])
-          !signal (rv/atom "All I do is change")
+          !signal-base (atom "All I do is change")
+          !signal (r/cursor !signal-base [])
           co (run!
-              ;;when I change...
-              @!signal
-              ;;update the counter
-              (swap! !counter inc))]
+               ;;when I change...
+               @!signal
+               ;;update the counter
+               (swap! !counter inc))]
       (is (= 1 @!counter) "Constraint run on init")
       (reset! !signal "foo")
       (r/flush)
@@ -88,7 +90,7 @@
           "Counter auto updated")
       (is (= @!ctr-base {:x {:y 2 :z 0}}))
       (dispose co))
-    (let [!x-base (rv/atom {:a {:b 0 :c {:d 0}}})
+    (let [!x-base (atom {:a {:b 0 :c {:d 0}}})
           !x (r/cursor !x-base [:a :c :d])
           !co (rv/make-reaction #(inc @!x) :auto-run true)]
       (is (= 1 @!co) "CO has correct value on first deref")
@@ -102,21 +104,21 @@
 (deftest test-unsubscribe
   (dotimes [x testite]
     (let [runs (running)
-          a-base (rv/atom {:test {:unsubscribe 0 :value 42}})
+          a-base (atom {:test {:unsubscribe 0 :value 42}})
           a (r/cursor a-base [:test :unsubscribe])
           a1 (reaction (inc @a))
           a2 (reaction @a)
-          b-changed (rv/atom 0)
+          b-changed (atom 0)
           b-saved (atom 0)
-          c-changed (rv/atom 0)
+          c-changed (atom 0)
           b (reaction
-             (swap! b-changed inc)
-             (inc @a1))
+              (swap! b-changed inc)
+              (inc @a1))
           c (reaction
-             (swap! c-changed inc)
-             (+ 10 @a2))
+              (swap! c-changed inc)
+              (+ 10 @a2))
           res (run!
-               (if (< @a2 1) @b @c))]
+                (if (< @a2 1) @b @c))]
       (is (= @res (+ 2 @a)))
       (is (= @b-changed 1))
       (is (= @c-changed 0))
@@ -155,31 +157,31 @@
 (deftest maybe-broken
   (let [runs (running)]
     (let [runs (running)
-          a-base (rv/atom {:a {:b 0 :c {:d 42}}})
+          a-base (atom {:a {:b 0 :c {:d 42}}})
           a (r/cursor a-base [:a :b])
           b (reaction (inc @a))
           c (reaction (dec @a))
           d (reaction (str @b))
-          res (rv/atom 0)
+          res (atom 0)
           cs (run!
-              (reset! res @d))]
+               (reset! res @d))]
       (is (= @res "1"))
       (dispose cs))
     ;; should be broken according to https://github.com/lynaghk/reflex/issues/1
     ;; but isnt
-    (let [a-base (rv/atom {:a 0})
+    (let [a-base (atom {:a 0})
           a (r/cursor a-base [:a])
           b (reaction (inc @a))
           c (reaction (dec @a))
           d (run! [@b @c])]
       (is (= @d [1 -1]))
       (dispose d))
-    (let [a-base (rv/atom 0)
+    (let [a-base (atom 0)
           a (r/cursor a-base [])
           b (reaction (inc @a))
           c (reaction (dec @a))
           d (run! [@b @c])
-          res (rv/atom 0)]
+          res (atom 0)]
       (is (= @d [1 -1]))
       (let [e (run! (reset! res @d))]
         (is (= @res [1 -1]))
@@ -190,25 +192,25 @@
 (deftest test-dispose
   (dotimes [x testite]
     (let [runs (running)
-          a-base (rv/atom {:a 0 :b 0})
+          a-base (atom {:a 0 :b 0})
           a (r/cursor a-base [:a])
-          disposed (rv/atom nil)
-          disposed-c (rv/atom nil)
-          disposed-cns (rv/atom nil)
-          count-b (rv/atom 0)
+          disposed (atom nil)
+          disposed-c (atom nil)
+          disposed-cns (atom nil)
+          count-b (atom 0)
           b (rv/make-reaction (fn []
                                 (swap! count-b inc)
                                 (inc @a))
                               :on-dispose #(reset! disposed true))
           c (rv/make-reaction #(if (< @a 1) (inc @b) (dec @a))
                               :on-dispose #(reset! disposed-c true))
-          res (rv/atom nil)
+          res (atom nil)
           cns (rv/make-reaction #(reset! res @c)
                                 :auto-run true
                                 :on-dispose #(reset! disposed-cns true))]
       @cns
       (is (= @res 2))
-      (is (= (+ 6 runs) (running)))
+      (is (= (+ 9 runs) (running)))
       (is (= @count-b 1))
       (is (= {:a 0 :b 0} @a-base))
       (reset! a -1)
@@ -216,13 +218,13 @@
       (is (= @res 1))
       (is (= @disposed nil))
       (is (= @count-b 2))
-      (is (= (+ 6 runs) (running)) "still running")
+      (is (= (+ 9 runs) (running)) "still running")
       (is (= {:a -1 :b 0} @a-base))
       (reset! a 2)
       (r/flush)
       (is (= @res 1))
       (is (= @disposed true))
-      (is (= (+ 4 runs) (running)) "less running count")
+      (is (= (+ 7 runs) (running)) "less running count")
       (is (= {:a 2 :b 0} @a-base))
 
       (reset! disposed nil)
@@ -244,7 +246,7 @@
 
 (deftest test-on-set
   (let [runs (running)
-        a-base (rv/atom {:set 0})
+        a-base (atom {:set 0})
         a (r/cursor a-base [:set])
         b (rv/make-reaction #(+ 5 @a)
                             :auto-run true
@@ -265,8 +267,8 @@
 
 
 (deftest test-equality
-  (let [a (r/atom {:foo "bar"})
-        a1 (r/atom {:foo "bar"})
+  (let [a (atom {:foo "bar"})
+        a1 (atom {:foo "bar"})
         c (r/cursor a [:foo])
         foo (fn
               ([path] (get-in @a path))
@@ -306,7 +308,7 @@
     (is (= @a {:foo "bar" :foobar "foo"}))))
 
 (deftest test-wrap
-  (let [aorig (r/atom {:foo "bar"})
+  (let [aorig (atom {:foo "bar"})
         a (r/cursor aorig [])
         w (r/wrap (:foo @a) swap! a assoc :foo)]
     (is (= @w "bar"))
@@ -323,7 +325,7 @@
 
 
 (deftest cursor-values
-  (let [test-atom (r/atom {:a {:b {:c {:d 1}}}})
+  (let [test-atom (atom {:a {:b {:c {:d 1}}}})
         test-cursor (r/cursor test-atom [:a :b :c :d])
         test-cursor2 (r/cursor test-atom [])
         runs (running)] ;; nasty edge case
@@ -362,9 +364,9 @@
 
 
 (deftest cursor-atom-behaviors
-  (let [test-atom (r/atom {:a {:b {:c {:d 1}}}})
+  (let [test-atom (atom {:a {:b {:c {:d 1}}}})
         test-cursor (r/cursor test-atom [:a :b :c :d])
-        witness (r/atom nil)
+        witness (atom nil)
         runs (running)]
     ;; per the description, reset! should return the new values
     (is (= {}
@@ -406,9 +408,10 @@
     ))
 
 (deftest wrap-atom-behaviors
-  (let [test-atom (r/atom "foo")
+  (let [test-atom-orig (atom "foo")
+        test-atom (r/cursor test-atom-orig [])
         test-wrap (r/wrap @test-atom reset! test-atom)
-        witness (r/atom nil)]
+        witness (atom nil)]
     ;; per the description, reset! should return the new values
     (is (= {}
            (reset! test-wrap {})))
@@ -440,7 +443,7 @@
     ))
 
 (deftest test-cursor-swap
-  (let [a (r/atom {:b 1})
+  (let [a (atom {:b 1})
         b (r/cursor a [:b])]
     (is (= 1 @b))
     (is (= 2 (swap! b inc)))
@@ -450,15 +453,15 @@
     (is (= 4 @b))))
 
 (deftest test-double-reset
-  (let [a (r/atom {:foo {:active? false}})
+  (let [a (atom {:foo {:active? false}})
         c (r/cursor a [:foo])
         f (fn []
             (swap! c assoc :not-pristine true)
             (swap! a update-in [:foo :active?] not)
             (r/flush))
-        spy (r/atom nil)
+        spy (atom nil)
         r (run!
-           (reset! spy (:active? @c)))]
+            (reset! spy (:active? @c)))]
     (is (= @spy false))
     (f)
     (is (= @spy true))
