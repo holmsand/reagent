@@ -95,9 +95,11 @@
     (let [a (set->array rs)
           age (.-age this)]
       ;; mark children as dirty first, so that _refresh always works
-      (dotimes [i (alength a)] (._mark-dirty (aget a i) age))
+      (dotimes [i (alength a)]
+        (._mark-dirty (aget a i) age))
       (when-not shallow
-        (dotimes [i (alength a)] (._handle-change (aget a i)))))))
+        (dotimes [i (alength a)]
+          (._handle-change (aget a i)))))))
 
 (defn- pr-atom [a writer opts s]
   (-write writer (str "#<" s " "))
@@ -120,8 +122,10 @@
       (._notify (aget q i)))))
 
 (defn flush! []
-  (try (flush-atoms)
-       (finally (set! flush-generation -1))))
+  (try
+    (flush-atoms)
+    (finally
+      (set! flush-generation -1))))
 
 (set! batch/ratom-flush flush!)
 
@@ -153,7 +157,8 @@
   (_remove-reaction [this r] (remove-r this r))
 
   (_enqueue [a old]
-    (set! age (set! generation (inc generation)))
+    (set! age
+          (set! generation (inc generation)))
     (when (identical? oldstate -no-value)
       (set! oldstate old)
       (when (nil? ratom-queue)
@@ -174,18 +179,19 @@
       (>= compare age) false
       ;; would flush trigger an update?
       (identical? oldstate -no-value) false
-      (= oldstate state) (do (set! oldstate state) false)
+      (= oldstate state) (do (set! oldstate state)
+                             false)
       :else true))
 
   IReset
   (-reset! [a new-value]
     (when-not (nil? validator)
       (assert (validator new-value) "Validator rejected reference state"))
-    (let [old-value state]
+    (let [old state]
       (set! state new-value)
-      (when-not (identical? old-value new-value)
-        (._enqueue a old-value))
-      (notify-w a old-value new-value)
+      (when-not (identical? old new-value)
+        (._enqueue a old))
+      (notify-w a old new-value)
       new-value))
 
   ISwap
@@ -210,9 +216,10 @@
 
 (defn atom
   "Like clojure.core/atom, except that it keeps track of derefs."
-  ([x] (->RAtom x nil nil nil -no-value -1 (next-rid)))
-  ([x & {:keys [meta validator]}] (->RAtom x meta validator nil -no-value -1
-                                           (next-rid))))
+  ([x]
+   (->RAtom x nil nil nil -no-value -1 (next-rid)))
+  ([x & {:keys [meta validator]}]
+   (->RAtom x meta validator nil -no-value -1 (next-rid))))
 
 
 ;;; track
@@ -228,18 +235,21 @@
       (some? r) (-deref r)
       (nil? *ratom-context*) (f)
       :else (let [r (make-reaction
-                     f :on-dispose (fn [r s]
-                                     (when debug (set! -nwatches (dec -nwatches)))
-                                     (as-> (aget o cache-key) _
-                                       (dissoc _ k)
-                                       (aset o cache-key _))
-                                     (when (some? obj)
-                                       (set! (.-reaction obj) nil))
-                                     (when (some? destroy)
-                                       (destroy s))))
+                      f :on-dispose (fn [r s]
+                                      (when debug
+                                        (set! -nwatches (dec -nwatches)))
+                                      (as-> (aget o cache-key) _
+                                        (dissoc _ k)
+                                        (aset o cache-key _))
+                                      (when (some? obj)
+                                        (set! (.-reaction obj) nil))
+                                      (when (some? destroy)
+                                        (destroy s))))
                   v (-deref r)]
-              (aset o cache-key (assoc (if (nil? m) {} m) k r))
-              (when debug (set! -nwatches (inc -nwatches)))
+              (aset o cache-key (-> (if (nil? m) {} m)
+                                    (assoc k r)))
+              (when debug
+                (set! -nwatches (inc -nwatches)))
               (when (some? obj)
                 (set! (.-reaction obj) r))
               v))))
@@ -270,8 +280,7 @@
 
 (defn make-track! [f args]
   (let [t (make-track f args)
-        r (make-reaction #(-deref t)
-                         :auto-run true)]
+        r (make-reaction #(-deref t) :auto-run true)]
     @r
     r))
 
@@ -388,12 +397,15 @@
   (if (== flush-generation -1) generation flush-generation))
 
 (defn- captured-exec [r f ^boolean update ^boolean check shallow]
-  (when (dev?) (set! (.-execGen r) (set! with-let-gen (inc with-let-gen))))
+  (when (dev?)
+    (set! (.-execGen r)
+          (set! with-let-gen (inc with-let-gen))))
   (let [res (if check
               (._try-exec r f (atom-generation))
               (._unchecked-exec r f (atom-generation)))]
     (if update
-      (._handle-result r res (if (nil? *-captured*) -empty-array *-captured*)
+      (._handle-result r res
+                       (if (nil? *-captured*) -empty-array *-captured*)
                        shallow)
       [res *-captured*])))
 
@@ -438,7 +450,9 @@
   (_remove-reaction [this r]
     (let [rs reactions]
       (remove-r this r)
-      (when (and (nil? auto-run) (some? rs) (nil? reactions))
+      (when (and (nil? auto-run)
+                 (some? rs)
+                 (nil? reactions))
         (dispose! this))))
 
   (_mark-dirty [this otherage]
@@ -446,9 +460,11 @@
       (set! age -1)))
 
   (_handle-change [this]
-    (when (and (== age -1) (not (nil? watching)))
+    (when (and (== age -1)
+               (some? watching))
       (let [ar auto-run]
-        (if (or (nil? ar) (true? ar))
+        (if (or (nil? ar)
+                (true? ar))
           (deref-capture this f true (nil? ar) false)
           (ar this)))))
 
@@ -482,7 +498,8 @@
         (->ReactionEx e))))
 
   (_maybe-notify [this old new shallow]
-    (when-not (or (and (nil? reactions) (nil? watches))
+    (when-not (or (and (nil? reactions)
+                       (nil? watches))
                   (= old new))
       (notify-r this shallow)
       (notify-w this old new)))
@@ -502,8 +519,12 @@
     (deref-capture this f true false true))
 
   (_run-refresh [this check]
-    (if (and (nil? watching) (nil? *ratom-context*) (nil? auto-run))
-      (._handle-result this (._unchecked-exec this f (atom-generation)) nil true)
+    (if (and (nil? watching)
+             (nil? *ratom-context*)
+             (nil? auto-run))
+      (._handle-result this
+                       (._unchecked-exec this f (atom-generation))
+                       nil true)
       (deref-capture this f true check true)))
 
   (_refresh-watching [this]
@@ -543,8 +564,10 @@
   IDeref
   (-deref [this]
     (notify-deref-watcher! this)
-    (when (instance? ReactionEx state) (throw (.-error state)))
-    (when (== age updating) (throw (js/Error. recursion-error)))
+    (when (instance? ReactionEx state)
+      (throw (.-error state)))
+    (when (== age updating)
+      (throw (js/Error. recursion-error)))
     (._refresh this -1)
     state)
 
@@ -582,10 +605,13 @@
          (or (nil? on-set) (fn? on-set))
          (or (nil? auto-run) (true? auto-run) (false? auto-run) (fn? auto-run))
          (or (nil? on-dispose) (fn? on-dispose))]}
-  (let [ar (if (false? auto-run) nil auto-run)
-        od (and on-dispose (array on-dispose))
-        r (->Reaction f nil ar od -1 (next-rid) nil nil nil)]
-    (when on-set (._set-opts r {:on-set on-set}))
+  (let [ar (when auto-run auto-run)
+        od (when on-dispose (array on-dispose))
+        r (->Reaction f nil ar od
+                      -1 (next-rid)
+                      nil nil nil)]
+    (when on-set
+      (._set-opts r {:on-set on-set}))
     r))
 
 
@@ -672,7 +698,8 @@
 
 
 
-#_(do
+#_
+(do
   (defn ratom-perf []
     (set! debug false)
     (dotimes [_ 10]
