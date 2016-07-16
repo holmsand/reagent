@@ -373,16 +373,22 @@
   IHash
   (-hash [_] (hash [ratom path])))
 
+(defn- counted-add-watch [a k f]
+  (when debug (inc-watches 1))
+  (add-watch a k f))
+
+(defn- counted-remove-watch [a k]
+  (when debug (inc-watches -1))
+  (remove-watch a k))
+
 (defn- native-cursor
   ([[orig path]]
    (with-let [a (atom @orig)
               key [path orig :native]
-              _ (do (add-watch orig key #(reset! a %4))
-                    (when debug (inc-watches 1)))]
+              _ (counted-add-watch orig key #(reset! a %4))]
      (get-in @a path)
      (finally
-       (remove-watch orig key)
-       (when debug (inc-watches -1)))))
+       (counted-remove-watch orig key))))
   ([[orig path] new-value]
    (swap-in! orig path new-value)))
 

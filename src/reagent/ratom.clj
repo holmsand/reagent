@@ -31,23 +31,23 @@
         [forms destroy] (let [fin (last body)]
                           (if (and (list? fin)
                                    (= 'finally (first fin)))
-                            [(butlast body) `(fn [] ~@(rest fin))]
+                            [(butlast body) (rest fin)]
                             [body nil]))
-        add-destroy (when destroy
-                      `(let [destroy# ~destroy]
-                         (if (reagent.ratom/reactive?)
-                           (when (nil? (.-destroy ~v))
-                             (set! (.-destroy ~v) destroy#))
-                           (destroy#))))
+        have-destroy (some? destroy)
         asserting (if *assert* true false)]
-    `(let [~v (reagent.ratom/with-let-values ~k)]
+    `(let [~v (reagent.ratom/with-let-values ~k)
+           c# reagent.ratom/*ratom-context*]
        (when ~asserting
-         (when-some [c# reagent.ratom/*ratom-context*]
+         (when (some? c#)
            (when (== (.-let-generation ~v) (.-execGen c#))
              (d/error "Warning: The same with-let is being used more "
                       "than once in the same reactive context."))
            (set! (.-let-generation ~v) (.-execGen c#))))
        (let ~bs
          (let [res# (do ~@forms)]
-           ~add-destroy
+           (when ~have-destroy
+             (if-not (nil? c#)
+               (when (nil? (.-destroy ~v))
+                 (set! (.-destroy ~v) (fn [] ~@destroy)))
+               (do ~@destroy)))
            res#)))))
