@@ -4,7 +4,7 @@
   :description "A simple ClojureScript interface to React"
 
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.8.51"]
+                 [org.clojure/clojurescript "1.9.89"]
                  [cljsjs/react-dom "15.2.1-0"]
                  [cljsjs/react-dom-server "15.2.1-0"]]
 
