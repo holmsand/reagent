@@ -21,8 +21,8 @@
                                        :compiler
                                        {:main "reagenttest.runtests"}}}}}
 
-             :fig [{:dependencies [[figwheel "0.5.3-2"]]
-                    :plugins [[lein-figwheel "0.5.3-2"]]
+             :fig [{:dependencies [[figwheel "0.5.4-7"]]
+                    :plugins [[lein-figwheel "0.5.4-7"]]
                     :source-paths ["demo"] ;; for lighttable
                     :resource-paths ["site" "outsite"]
                     :figwheel {:css-dirs ["site/public/css"]}
