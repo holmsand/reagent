@@ -40,6 +40,10 @@ runprodtest: clean
 clean:
 	lein clean
 
+# force recompilation of all files
+touch:
+	find src test demo -name '*.clj*' | xargs touch
+
 
 ## Subtargets
 
