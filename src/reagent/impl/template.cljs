@@ -76,19 +76,29 @@
                    (apply x args))
         :else (clj->js x)))
 
+(defn join-class [c1 c2]
+  (let [add (if (array? c2)
+              (when (pos? (alength c2))
+                (.join c2 " "))
+              c2)]
+    (cond (nil? c1) add
+          (nil? add) c1
+          :else (str c1 " " add))))
+
 (defn set-id-class [p parsed]
   (let [p (if (nil? p) #js{} p)
-        c ($ p :className)
-        oldclass (if (array? c)
-                   ($! p :className (.join c " "))
-                   c)]
+        oldclass (when (js-in "className" p)
+                   ($ p :className))
+        class (join-class (.-className parsed) oldclass)
+        styleclass (some-> p ($ :style) ($ :className))
+        class (join-class class styleclass)]
+    (when-not (nil? styleclass)
+      (js-delete ($ p :style) "className"))
     (when-some [id (.-id parsed)]
       (when (nil? ($ p :id))
         ($! p :id id)))
-    (when-some [class (.-className parsed)]
-      ($! p :className (if (nil? oldclass)
-                         class
-                         (str class " " oldclass))))
+    (when-not (identical? class oldclass)
+      ($! p :className class))
     p))
 
 (defn convert-props [props parsed]
