@@ -37,4 +37,10 @@ if (!compileFail()) {
     process.exit(1);
   }
 }
-process.exit(0);
+
+var fail = 0;
+if (typeof reagenttest !== "undefined") {
+    fail = reagenttest.runtests.failed();
+}
+
+process.exit(fail);

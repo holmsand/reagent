@@ -8,8 +8,10 @@
                  [cljsjs/react-dom "15.2.1-0"]
                  [cljsjs/react-dom-server "15.2.1-0"]]
 
-  :plugins [[lein-cljsbuild "1.1.3"]
+  :plugins [[lein-cljsbuild "1.1.2"]
             [codox "0.9.0"]]
+
+  :hooks [leiningen.cljsbuild]
 
   :source-paths ["src"]
 
@@ -42,14 +44,15 @@
                     {:builds {:client
                               {:notify-command ["node" "bin/gen-site.js"]}}}}
 
-             :prod [:site
-                    {:cljsbuild
-                     {:builds {:client
-                               {:compiler {:optimizations :advanced
-                                           :elide-asserts true
-                                           :pretty-print false
-                                           ;; :pseudo-names true
-                                           :output-dir "target/client"}}}}}]
+             :advanced {:cljsbuild
+                        {:builds {:client
+                                  {:compiler {:optimizations :advanced
+                                              :elide-asserts true
+                                              :pretty-print false
+                                              ;; :pseudo-names true
+                                              :output-dir "target/client"}}}}}
+
+             :prod [:advanced :site]
 
              :webpack {:cljsbuild
                        {:builds {:client
@@ -84,7 +87,9 @@
                                        "examples/geometry/src"]
                         :compiler {:parallel-build true
                                    :main "reagentdemo.core"
-                                   :output-to "outsite/public/js/main.js"}}}}
+                                   :output-to "outsite/public/js/main.js"}}}
+              :test-commands {"test-phantom" ["phantomjs" "bin/phantom.js"]
+                              "test-node" ["node" "bin/gen-site.js"]}}
 
   :figwheel {:http-server-root "public" ;; assumes "resources"
              :repl false})

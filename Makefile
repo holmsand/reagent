@@ -41,6 +41,27 @@ clean:
 	lein clean
 
 
+## Testing
+
+test: clean
+	lein cljsbuild test
+
+test-pack: clean target/webpack/bundle.js
+	lein with-profile test,dev,webpack cljsbuild test
+
+test-prod: clean
+	lein with-profile test,advanced cljsbuild test
+
+test-prod-pack: clean target/webpack/bundle.js
+	lein with-profile test,advanced,webpack cljsbuild test
+
+test-all:
+	$(MAKE) test
+	$(MAKE) test-pack
+	$(MAKE) test-prod
+	$(MAKE) test-prod-pack
+
+
 ## Subtargets
 
 figwheel: trigger-build

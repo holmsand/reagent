@@ -34,9 +34,17 @@
 
 (defn run-tests []
   (reset! test-results nil)
-  (if r/is-client
+  (if (and r/is-client
+           (not (re-find #"PhantomJS" js/window.navigator.userAgent)))
     (js/setTimeout all-tests 50)
     (all-tests)))
+
+(defn ^:export failed []
+  (let [r @test-results
+        fail (+ (:fail r) (:error r))]
+    (when (> fail 0)
+      (println "********** Tests failed ***********"))
+    fail))
 
 (defn test-output-mini []
   (let [res @test-results]

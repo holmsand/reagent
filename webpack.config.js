@@ -6,6 +6,9 @@ var prod = process.env.NODE_ENV === "production";
 
 
 module.exports = {
+    stats: {
+        warnings: false
+    },
     entry: './lib/modules.js',
     output: {
         path: "./target/webpack/",
