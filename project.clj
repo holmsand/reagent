@@ -4,7 +4,7 @@
   :description "A simple ClojureScript interface to React"
 
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.93"]
+                 [org.clojure/clojurescript "1.9.89"]
                  [cljsjs/react-dom "15.2.1-0"]
                  [cljsjs/react-dom-server "15.2.1-0"]]
 
@@ -32,8 +32,7 @@
                     {:builds
                      {:client
                       {:figwheel true
-                       :compiler {:source-map true
-                                  :optimizations :none
+                       :compiler {:optimizations :none
                                   :recompile-dependents false
                                   :output-dir "outsite/public/js/out"
                                   :asset-path "js/out"}}}}}]
