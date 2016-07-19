@@ -231,7 +231,7 @@
 
 (def ^:private cache-key "reagReactionCache")
 
-(defn- cached-reaction [f o k obj destroy]
+(defn- cached-reaction [f o k obj destroy name]
   (let [m (aget o cache-key)
         r (get m k nil)]
     (cond
@@ -246,7 +246,8 @@
                                       (when (some? obj)
                                         (set! (.-reaction obj) nil))
                                       (when (some? destroy)
-                                        (destroy s))))
+                                        (destroy s)))
+                      :name name)
                   v (-deref r)]
               (aset o cache-key (-> (if (nil? m) {} m)
                                     (assoc k r)))
@@ -262,7 +263,7 @@
   (-deref [this]
     (if-some [r reaction]
       (-deref r)
-      (cached-reaction #(apply f args) f args this nil)))
+      (cached-reaction #(apply f args) f args this nil "Track")))
 
   IEquiv
   (-equiv [_ other]
@@ -303,7 +304,7 @@
 (defn with-let-values [key]
   (if-some [c *ratom-context*]
     (cached-reaction array c key
-                     nil with-let-destroy)
+                     nil with-let-destroy "with-let")
     (array)))
 
 
@@ -343,7 +344,7 @@
                      (let [f (if (satisfies? IDeref ratom)
                                #(get-in @ratom path)
                                #(ratom path))]
-                       (cached-reaction f ratom path this nil)))]
+                       (cached-reaction f ratom path this nil "Cursor")))]
       (._set-state this oldstate newstate)
       newstate))
 
@@ -445,7 +446,8 @@
 
 (deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
                    ^:mutable ^number age rid
-                   ^:mutable reactions ^:mutable watches ^:mutable watching]
+                   ^:mutable reactions ^:mutable watches ^:mutable watching
+                   name]
   IAtom
   IReactiveAtom
 
@@ -623,12 +625,12 @@
   (-equiv [o other] (identical? o other))
 
   IPrintWithWriter
-  (-pr-writer [a w opts] (pr-atom a w opts "Reaction:"))
+  (-pr-writer [a w opts] (pr-atom a w opts (or name "Reaction:")))
 
   IHash
   (-hash [this] rid))
 
-(defn make-reaction [f & {:keys [auto-run on-set on-dispose]}]
+(defn make-reaction [f & {:keys [auto-run on-set on-dispose name]}]
   {:pre [(ifn? f)
          (or (nil? on-set) (fn? on-set))
          (or (nil? auto-run) (true? auto-run) (false? auto-run) (fn? auto-run))
@@ -637,7 +639,8 @@
         od (when on-dispose (array on-dispose))
         r (->Reaction f nil ar od
                       -1 (next-rid)
-                      nil nil nil)]
+                      nil nil nil
+                      name)]
     (when on-set
       (._set-opts r {:on-set on-set}))
     r))
@@ -668,6 +671,15 @@
 (defn check-derefs [f]
   (let [[res captured] (deref-capture check-reaction f false false true)]
     [res (-> captured some?)]))
+
+(defn reacting-to []
+  (if (nil? *ratom-context*)
+    nil
+    (let [a (.-watching *ratom-context*)]
+      (if (or (nil? a)
+              (== 0 (alength a)))
+        (list)
+        (seq a)))))
 
 
 ;;; wrap
