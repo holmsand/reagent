@@ -982,7 +982,7 @@
 (deftest test-object-children
   (is (= "<p>foo bar1</p>"
          (rstr [:p 'foo " " :bar nil 1])))
-  (is (= "<p>#&lt;Atom: 1&gt;</p>"
+  (is (= "<p>#&lt;RAtom: 1&gt;</p>"
          (rstr [:p (r/atom 1)]))))
 
 (deftest test-after-render

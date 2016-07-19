@@ -207,7 +207,7 @@
   (-meta [_] meta)
 
   IPrintWithWriter
-  (-pr-writer [a w opts] (pr-atom a w opts "Atom:"))
+  (-pr-writer [a w opts] (pr-atom a w opts "RAtom:"))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
@@ -363,7 +363,7 @@
   (-swap! [a f x y more] (-reset! a (apply f (._peek a) x y more)))
 
   IPrintWithWriter
-  (-pr-writer [a w opts] (pr-atom a w opts (str "Cursor: " path)))
+  (-pr-writer [a w opts] (pr-atom a w opts "Cursor:"))
 
   IWatchable
   (-notify-watches [this old new] (notify-w this old new))
@@ -623,7 +623,7 @@
   (-equiv [o other] (identical? o other))
 
   IPrintWithWriter
-  (-pr-writer [a w opts] (pr-atom a w opts (str "Reaction " (hash a) ":")))
+  (-pr-writer [a w opts] (pr-atom a w opts "Reaction:"))
 
   IHash
   (-hash [this] rid))

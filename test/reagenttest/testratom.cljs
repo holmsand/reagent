@@ -590,3 +590,19 @@
 
     (dispose res)
     (is (= runs (running)))))
+
+(deftest str-values
+  (let [a (r/atom {:a {:b 0}})]
+    (is (= (pr-str (r/atom nil))
+           "#<RAtom: nil>"))
+    (is (= (pr-str (r/atom {:a 1}))
+           "#<RAtom: {:a 1}>"))
+    (is (= (pr-str (r/cursor a []))
+           "#<Cursor: {:a {:b 0}}>"))
+    (is (= (pr-str (r/cursor a [:a]))
+           "#<Cursor: {:b 0}>"))
+    (reset! a {:b 1})
+    (is (= (pr-str (r/track deref a))
+           "#<Track: {:b 1}>"))
+    (is (= (pr-str (reaction @a))
+           "#<Reaction: {:b 1}>"))))
