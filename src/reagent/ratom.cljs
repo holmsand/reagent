@@ -542,8 +542,15 @@
         (._maybe-notify this old res shallow)))
     res)
 
-  (_run-reactive [this]
-    (deref-capture this f true false true))
+  (_check-error [this]
+    (when (instance? ReactionEx state)
+      (throw (.-error state))))
+
+  (_run-reactive [this fun]
+    (let [res (deref-capture this (if (nil? fun) f fun)
+                             true false true)]
+      (._check-error this)
+      res))
 
   (_run-refresh [this check]
     (when (== age updating)
@@ -578,7 +585,8 @@
                   (nil? watching) true
                   :else ^boolean (._refresh-watching this))]
       (if dirty
-        (._run-refresh this (not (== compare -1)))
+        (._run-refresh this (not (and (nil? *ratom-context*)
+                                      (nil? auto-run))))
         (set! age gen))
       false))
 
@@ -590,16 +598,14 @@
 
   IRunnable
   (run [this]
-    (._run-reactive this))
+    (._run-reactive this nil))
 
   IDeref
   (-deref [this]
-    ;; TODO: Make sure we listen even to reactions that throw on the
-    ;; first try. I.e use try-exec whenever *ratom-context*?
     (notify-deref-watcher! this)
-    (when (instance? ReactionEx state)
-      (throw (.-error state)))
+    (._check-error this)
     (._refresh this -1)
+    (._check-error this)
     state)
 
   IDisposable
@@ -657,7 +663,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        res (deref-capture r f true false true)]
+        res (._run-reactive r f)]
     (when (-> r .-watching arr-len pos?)
       (reset-temp-reaction)
       (set! (.-state r) nil)

@@ -139,7 +139,7 @@
                     (if (nil? rat)
                       (ratom/run-in-reaction #(do-render c) c "cljsRatom"
                                              batch/queue-render rat-opts)
-                      (._run-reactive rat))))))})
+                      (._run-reactive rat nil))))))})
 
 (defn custom-wrapper [key f]
   (case key
