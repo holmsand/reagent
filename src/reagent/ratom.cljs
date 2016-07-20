@@ -521,7 +521,7 @@
     (try
       (._unchecked-exec this f gen)
       (catch :default e
-        (set! age gen)
+        (set! age (atom-generation))
         (error "Error in Reaction: " e)
         (->ReactionEx e))))
 
@@ -547,10 +547,6 @@
     (deref-capture this f true false true))
 
   (_run-refresh [this check]
-    (when (== age updating)
-      (let [e (js/Error. recursion-error)]
-        (error e)
-        (throw e)))
     (if (and (nil? watching)
              (nil? *ratom-context*)
              (nil? auto-run))
@@ -571,6 +567,10 @@
       (neg? age)))
 
   (_refresh [this compare]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        (error e)
+        (throw e)))
     (let [gen (atom-generation)
           a age
           dirty (cond
