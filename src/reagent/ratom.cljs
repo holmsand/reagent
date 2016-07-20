@@ -522,8 +522,6 @@
       (._unchecked-exec this f gen)
       (catch :default e
         (set! age gen)
-        (when (= recursion-error (.-message e))
-          (throw e))
         (error "Error in Reaction: " e)
         (->ReactionEx e))))
 
@@ -549,6 +547,10 @@
     (deref-capture this f true false true))
 
   (_run-refresh [this check]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        (error e)
+        (throw e)))
     (if (and (nil? watching)
              (nil? *ratom-context*)
              (nil? auto-run))
@@ -596,8 +598,6 @@
     (notify-deref-watcher! this)
     (when (instance? ReactionEx state)
       (throw (.-error state)))
-    (when (== age updating)
-      (throw (js/Error. recursion-error)))
     (._refresh this -1)
     state)
 
