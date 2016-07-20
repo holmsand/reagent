@@ -547,6 +547,11 @@
     (deref-capture this f true false true))
 
   (_run-refresh [this check]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        (when check
+          (set! state (->ReactionEx e)))
+        (throw e)))
     (if (and (nil? watching)
              (nil? *ratom-context*)
              (nil? auto-run))
@@ -567,10 +572,6 @@
       (neg? age)))
 
   (_refresh [this compare]
-    (when (== age updating)
-      (let [e (js/Error. recursion-error)]
-        (error e)
-        (throw e)))
     (let [gen (atom-generation)
           a age
           dirty (cond
@@ -595,6 +596,10 @@
 
   IDeref
   (-deref [this]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        (error e)
+        (throw e)))
     (notify-deref-watcher! this)
     (when (instance? ReactionEx state)
       (throw (.-error state)))
