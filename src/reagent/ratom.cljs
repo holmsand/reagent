@@ -512,14 +512,10 @@
             (._remove-reaction r this))))))
 
   (_unchecked-exec [this f gen]
-    ;; (when (== age updating)
-    ;;   (let [e (js/Error. recursion-error)]
-    ;;     ;; (set! age gen)
-    ;;     (throw e)))
-    ;; (set! age updating)
     (when updating
-      (error recursion-error)
-      (throw (js/Error. recursion-error)))
+      (let [e (js/Error. recursion-error)]
+        (error e)
+        (throw e)))
     (try
       (set! updating true)
       (let [res (f)]
@@ -603,11 +599,11 @@
 
   IDeref
   (-deref [this]
-    (when updating
-      (let [e (js/Error. recursion-error)]
-        (error e)
-        (throw e)))
     (notify-deref-watcher! this)
+    ;; (when updating
+    ;;   (let [e (js/Error. recursion-error)]
+    ;;     (error e)
+    ;;     (throw e)))
     (when (instance? ReactionEx state)
       (throw (.-error state)))
     (._refresh this -1)
@@ -668,7 +664,7 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        _ (set! (.-age r) -1)
+        ;; _ (set! (.-updating r) false)
         res (deref-capture r f true false true)]
     (when (-> r .-watching arr-len pos?)
       (reset-temp-reaction)
