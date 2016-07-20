@@ -10,7 +10,7 @@
 (def title "Calc")
 
 (defonce calcs (r/atom ["(+ 1 2 3)"
-                        "(- 0 4 6)"]))
+                        "(- '0 4 6)"]))
 
 (defn handle [old [action k v]]
   (case action
@@ -73,14 +73,21 @@
       [:p {:style {:color 'red}}
        "Error: " (.-message e)])))
 
-(defn calculations []
+(defn calc-table []
   [:table {:style {:width "100%"}}
    [:tbody
-    (for [i (range @(r/track input-count))]
-      ^{:key i} [:tr
-                 [:td i]
-                 [:td [calc-input i]]
-                 [:td [calc-output i]]])]])
+    (doall
+      (for [i (range @(r/track input-count))]
+        ^{:key i} [:tr
+                   [:td i]
+                   [:td [calc-input i]]
+                   [:td [calc-output i]]
+                   [:td @(r/track input-n i)]]))]])
+
+(defn calculations []
+  [:div
+   (pr-str @calcs)
+   [calc-table]])
 
 (defn story-summary []
   [:div.demo-text
