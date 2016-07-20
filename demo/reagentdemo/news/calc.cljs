@@ -9,8 +9,8 @@
 (def url "/news/calc.html")
 (def title "Calc")
 
-(defonce calcs (r/atom ["(+ 1 2 3)"
-                        "(- '0 4 6)"]))
+(def calcs (r/atom ["(+ 1 2 3)"
+                    "(- '1 4 6)"]))
 
 (defn handle [old [action k v]]
   (case action
@@ -21,6 +21,7 @@
   (r/rswap! calcs handle evt))
 
 (defn input-n [n]
+  (dbg n)
   (nth @calcs n ""))
 
 (defn input-count []
@@ -31,6 +32,7 @@
       n)))
 
 (defn read-n [n]
+  (dbg n)
   (reader/read-string @(r/track input-n n)))
 
 (declare expand)
@@ -53,7 +55,7 @@
 
         (and (list? x)
              (= (first x) 'quote))
-        (expand @(r/track result (nth x 1)))
+        @(r/track result (nth x 1))
 
         :else x))
 

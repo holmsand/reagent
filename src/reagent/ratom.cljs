@@ -229,7 +229,7 @@
 
 (declare make-reaction)
 
-(def ^:private cache-key "reagReactionCache" generation)
+(def ^:private cache-key "reagReactionCache")
 
 (defn- cached-reaction [f o k obj destroy name]
   (let [m (aget o cache-key)
@@ -247,14 +247,13 @@
                                         (set! (.-reaction obj) nil))
                                       (when (some? destroy)
                                         (destroy s)))
-                      :name name)
-                  v (-deref r)]
+                      :name name)]
               (aset o cache-key (-> (if (nil? m) {} m)
                                     (assoc k r)))
               (when debug (inc-watches 1))
               (when (some? obj)
                 (set! (.-reaction obj) r))
-              v))))
+              (-deref r)))))
 
 (deftype Track [f args ^:mutable reaction]
   IReactiveAtom
@@ -418,7 +417,7 @@
   (run [this]))
 
 (def recursion-error "Recursion in Reaction not allowed")
-;; (def updating -2)
+(def updating -2)
 
 (deftype ReactionEx [error])
 
@@ -445,7 +444,7 @@
 
 
 (deftype Reaction [f ^:mutable state ^:mutable auto-run ^:mutable on-dispose
-                   ^:mutable ^number age rid ^:mutable ^boolean updating
+                   ^:mutable ^number age rid
                    ^:mutable reactions ^:mutable watches ^:mutable watching
                    name]
   IAtom
@@ -512,17 +511,10 @@
             (._remove-reaction r this))))))
 
   (_unchecked-exec [this f gen]
-    (when updating
-      (let [e (js/Error. recursion-error)]
-        (error e)
-        (throw e)))
-    (try
-      (set! updating true)
-      (let [res (f)]
-        (set! age gen)
-        res)
-      (finally
-        (set! updating false))))
+    (set! age updating)
+    (let [res (f)]
+      (set! age gen)
+      res))
 
   (_try-exec [this f gen]
     (try
@@ -551,10 +543,13 @@
     res)
 
   (_run-reactive [this]
-    (set! age -1)
     (deref-capture this f true false true))
 
   (_run-refresh [this check]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        (error e)
+        (throw e)))
     (if (and (nil? watching)
              (nil? *ratom-context*)
              (nil? auto-run))
@@ -600,10 +595,6 @@
   IDeref
   (-deref [this]
     (notify-deref-watcher! this)
-    ;; (when updating
-    ;;   (let [e (js/Error. recursion-error)]
-    ;;     (error e)
-    ;;     (throw e)))
     (when (instance? ReactionEx state)
       (throw (.-error state)))
     (._refresh this -1)
@@ -646,7 +637,7 @@
   (let [ar (when auto-run auto-run)
         od (when on-dispose (array on-dispose))
         r (->Reaction f nil ar od
-                      -1 (next-rid) false
+                      -1 (next-rid)
                       nil nil nil
                       name)]
     (when on-set
@@ -664,7 +655,6 @@
 
 (defn run-in-reaction [f obj key run opts]
   (let [r temp-reaction
-        ;; _ (set! (.-updating r) false)
         res (deref-capture r f true false true)]
     (when (-> r .-watching arr-len pos?)
       (reset-temp-reaction)
