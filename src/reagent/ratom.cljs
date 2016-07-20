@@ -594,6 +594,8 @@
 
   IDeref
   (-deref [this]
+    ;; TODO: Make sure we listen even to reactions that throw on the
+    ;; first try. I.e use try-exec whenever *ratom-context*?
     (notify-deref-watcher! this)
     (when (instance? ReactionEx state)
       (throw (.-error state)))
