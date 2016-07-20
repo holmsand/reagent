@@ -3,6 +3,7 @@
             [reagentdemo.news.async :as async]
             [reagentdemo.news.undodemo :as undodemo]
             [reagentdemo.news.clockpost :as clock]
+            [reagentdemo.news.calc :as calc]
             [reagentdemo.news.news050 :as news050]
             [reagentdemo.news.news051 :as news051]
             [reagentdemo.news.news060 :as news060]
@@ -11,6 +12,7 @@
 
 (defn main []
   [:div
+   [calc/main {:summary true}]
    [news060r/main {:summary true}]
    [news060/main {:summary true}]
    [news051/main {:summary true}]
