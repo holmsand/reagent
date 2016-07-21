@@ -51,9 +51,11 @@
             (apply (funs (first x)) y)
             y))
 
-        (and (list? x)
-             (= (first x) 'quote))
-        @(r/track result (nth x 1))
+        (and (symbol? x)
+             (-> x name count (> 1))
+             (= "%" (-> x name first)))
+        (let [i (-> x name (subs 1) int)]
+          @(r/track result i))
 
         :else x))
 

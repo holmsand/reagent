@@ -494,7 +494,7 @@
       (let [ar auto-run]
         (if (or (nil? ar)
                 (true? ar))
-          (deref-capture this f true (nil? ar) false)
+          (deref-capture this f true true #_(nil? ar) false)
           (ar this)))))
 
   (_update-watching [this derefed]
@@ -549,7 +549,6 @@
   (_run-reactive [this fun]
     (let [res (deref-capture this (if (nil? fun) f fun)
                              true false true)]
-      (._check-error this)
       res))
 
   (_run-refresh [this check]
