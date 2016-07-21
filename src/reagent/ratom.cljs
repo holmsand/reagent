@@ -550,7 +550,7 @@
   (_check-recursion [this]
     (when (== age updating)
       (let [e (js/Error. recursion-error)]
-        ;; (set! state (->ReactionEx e))
+        (set! state (->ReactionEx e))
         (error e)
         (throw e))))
 
@@ -610,7 +610,6 @@
     (notify-deref-watcher! this)
     (._check-error this)
     (._refresh this -1)
-    (._check-error this)
     state)
 
   IDisposable

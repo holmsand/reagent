@@ -10,7 +10,8 @@
 (def title "Calc")
 
 (defonce calcs (r/atom ["(+ 1 2 3)"
-                        "(- 1 4 6)"]))
+                        "(+ %0 1 4 6)"
+                        "(- %1 2)"]))
 
 (def no-catching false)
 
@@ -33,12 +34,7 @@
       n)))
 
 (defn read-n [n]
-  (if no-catching
-    (reader/read-string @(r/track input-n n))
-    (try
-      (reader/read-string @(r/track input-n n))
-      (catch :default e
-        (.-message e)))))
+  (reader/read-string @(r/track input-n n)))
 
 (declare expand)
 
@@ -56,20 +52,22 @@
            '/ /})
 
 (defn expand [x]
-  (cond (and (list? x)
-             (-> x first funs))
-        (let [y (map expand (rest x))]
-          (if (every? number? y)
-            (apply (funs (first x)) y)
-            y))
+  (or (and (list? x)
+             (-> x first funs)
+             (let [y (doall (map expand (rest x)))]
+               (if (every? number? y)
+                 (-> x first funs (apply y))
+                 (cons (first x) y))))
 
-        (and (symbol? x)
-             (-> x name count (> 1))
-             (= "%" (-> x name first)))
-        (let [i (-> x name (subs 1) int)]
-          @(r/track result i))
+      (and (symbol? x)
+           (-> x name count (> 1))
+           (= "%" (-> x name first))
+           (let [i (-> x name (subs 1) int)]
+             @(r/track result i)))
 
-        :else x))
+      (and (number? x) x)
+
+      x))
 
 (defn calc-input [n]
   [:input {:type 'text
@@ -97,7 +95,8 @@
                    [:td i]
                    [:td [calc-input i]]
                    [:td [calc-output i]]
-                   [:td @(r/track input-n i)]]))]])
+                   ;; [:td [:code @(r/track input-n i)]]
+                   ]))]])
 
 (defn calculations []
   [:div
