@@ -544,7 +544,15 @@
 
   (_check-error [this]
     (when (instance? ReactionEx state)
-      (throw (.-error state))))
+      (let [e (.-error state)]
+        (throw e))))
+
+  (_check-recursion [this]
+    (when (== age updating)
+      (let [e (js/Error. recursion-error)]
+        ;; (set! state (->ReactionEx e))
+        (error e)
+        (throw e))))
 
   (_run-reactive [this fun]
     (let [res (deref-capture this (if (nil? fun) f fun)
@@ -552,10 +560,7 @@
       res))
 
   (_run-refresh [this check]
-    (when (== age updating)
-      (let [e (js/Error. recursion-error)]
-        (error e)
-        (throw e)))
+    (._check-recursion this)
     (if (and (nil? watching)
              (nil? *ratom-context*)
              (nil? auto-run))
@@ -602,6 +607,7 @@
   IDeref
   (-deref [this]
     (notify-deref-watcher! this)
+    (._check-recursion this)
     (._check-error this)
     (._refresh this -1)
     (._check-error this)
