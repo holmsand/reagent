@@ -12,6 +12,8 @@
 (defonce calcs (r/atom ["(+ 1 2 3)"
                         "(- 1 4 6)"]))
 
+(def no-catching false)
+
 (defn handle [old [action k v]]
   (case action
     :set (assoc old k v)
@@ -31,12 +33,22 @@
       n)))
 
 (defn read-n [n]
-  (reader/read-string @(r/track input-n n)))
+  (if no-catching
+    (reader/read-string @(r/track input-n n))
+    (try
+      (reader/read-string @(r/track input-n n))
+      (catch :default e
+        (.-message e)))))
 
 (declare expand)
 
 (defn result [n]
-  (expand @(r/track read-n n)))
+  (if no-catching
+    (expand @(r/track read-n n))
+    (try
+      (expand @(r/track read-n n))
+      (catch :default e
+        (.-message e)))))
 
 (def funs {'+ +
            '- -
@@ -69,8 +81,9 @@
 (defn calc-output [n]
   (try
     (let [val @(r/track result n)]
-      (when val
-        [:pre " = " (pr-str val)]))
+      (cond
+        (string? val) [:code {:style {:color 'red}} val]
+        (some? val) [:code " = " (pr-str val)]))
     (catch :default e
       [:p {:style {:color 'red}}
        "Error: " (.-message e)])))

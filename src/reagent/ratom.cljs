@@ -606,8 +606,8 @@
 
   IDeref
   (-deref [this]
-    (notify-deref-watcher! this)
     (._check-recursion this)
+    (notify-deref-watcher! this)
     (._check-error this)
     (._refresh this -1)
     (._check-error this)
