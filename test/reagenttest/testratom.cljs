@@ -1,7 +1,7 @@
 (ns reagenttest.testratom
   (:require [cljs.test :as t :refer-macros [is deftest testing]]
             [reagent.ratom :as rv :refer-macros [run! reaction]]
-            [reagent.debug :as debug :refer-macros [dbg]]
+            [reagent.debug :as debug :refer-macros [dbg with-tracked-warnings]]
             [reagent.core :as r]))
 
 (defn fixture [f]
@@ -397,7 +397,7 @@
            (when (> @state 1)
              (throw (js/Error. "oops"))))]
     (is (= @count 1))
-    (is (thrown? :default (do
+    (is (thrown? :default (with-tracked-warnings
                             (swap! state inc)
                             (rv/flush!))))
     (is (= @count 2))
@@ -446,7 +446,7 @@
     (swap! state assoc :val 2)
     (r/flush)
     (swap! state assoc :error? true)
-    (is (thrown? :default (r/flush)))
+    (is (thrown? :default (with-tracked-warnings (r/flush))))
     (r/flush)
     (r/flush)
     (dispose r1)
@@ -463,7 +463,8 @@
               (throw (ex-info "fail" nil))))]
     (swap! state assoc :val 13)
     (is (thrown? :default
-                 (r/flush)))
+                 (with-tracked-warnings
+                   (r/flush))))
     (swap! state assoc :val 2)
     (r/flush)
     (dispose r1)
@@ -500,16 +501,16 @@
     (is (= @t 3))
     (swap! tracks assoc :b (r/track plus :a :b))
     (is (thrown-with-msg? :default #"Recursion in Reactio"
-                          (r/flush)))
+                          (with-tracked-warnings (r/flush))))
     (reset! state -1)
     (is (nil? (r/flush)))
     (is (= @t -1))
     (reset! state 4)
     (is (thrown-with-msg? :default #"Recursion in Reaction"
-                          (r/flush)))
+                          (with-tracked-warnings (r/flush))))
     (reset! state 12)
     (is (thrown-with-msg? :default #"Recursion in Reaction not"
-                          (r/flush)))
+                          (with-tracked-warnings (r/flush))))
     (reset! state -11)
     (is (nil? (r/flush)))
     (is (= @t -11))

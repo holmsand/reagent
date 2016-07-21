@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [atom])
   (:require-macros [reagent.ratom :refer [with-let]])
   (:require [clojure.set :as s]
-            [reagent.debug :refer-macros [dbg log warn error dev? time]]
+            [reagent.debug :as d :refer-macros [dbg log warn error dev? time]]
             [reagent.impl.batching :as batch]
             [reagent.impl.util :as util]))
 
@@ -119,10 +119,12 @@
 (defn- flush-atoms []
   (assert (== flush-generation -1) "Can't flush in flush")
   (set! flush-generation generation)
+  (d/clear-errors)
   (when-some [q ratom-queue]
     (set! ratom-queue nil)
     (dotimes [i (alength q)]
-      (._notify (aget q i)))))
+      (._notify (aget q i))))
+  (d/report-errors))
 
 (defn flush! []
   (try
@@ -521,7 +523,9 @@
       (._unchecked-exec this f gen)
       (catch :default e
         (set! age gen)
-        (error "Error in Reaction: " e)
+        (let [n (or name "Reaction")]
+          (d/exception (some? auto-run)
+                       e "Uncaught error in " (or name "Reaction")))
         (->ReactionEx e))))
 
   (_maybe-notify [this old new shallow]

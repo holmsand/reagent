@@ -9,19 +9,19 @@
 (def url "/news/calc.html")
 (def title "Calc")
 
+
 (defonce calcs (r/atom ["(+ 1 2 3)"
                         "(+ %0 1 4 6)"
                         "(- %1 2)"]))
 
-(def no-catching false)
-
-(defn handle [old [action k v]]
+(defn handle-event [old [action k v]]
   (case action
-    :set (assoc old k v)
+    :set-calc (assoc old k v)
     old))
 
 (defn emit [evt]
-  (r/rswap! calcs handle evt))
+  (swap! calcs handle-event evt))
+
 
 (defn input-n [n]
   (nth @calcs n ""))
@@ -29,22 +29,21 @@
 (defn input-count []
   (let [c @calcs
         n (count c)]
-    (if (and (pos? n) (-> c last count pos?))
+    ;; Add empty input
+    (if (or (zero? n) (-> c last count pos?))
       (inc n)
       n)))
 
-(defn read-n [n]
+(defn parse [n]
   (reader/read-string @(r/track input-n n)))
 
 (declare expand)
 
 (defn result [n]
-  (if no-catching
-    (expand @(r/track read-n n))
-    (try
-      (expand @(r/track read-n n))
-      (catch :default e
-        (.-message e)))))
+  (try
+    (expand @(r/track parse n))
+    (catch :default e
+      (.-message e))))
 
 (def funs {'+ +
            '- -
@@ -53,55 +52,40 @@
 
 (defn expand [x]
   (or (and (list? x)
-             (-> x first funs)
-             (let [y (doall (map expand (rest x)))]
-               (if (every? number? y)
-                 (-> x first funs (apply y))
-                 (cons (first x) y))))
-
+           (-> x first funs)
+           (let [y (doall (map expand (rest x)))]
+             (if (every? number? y)
+               (-> x first funs (apply y))
+               (cons (first x) y))))
       (and (symbol? x)
-           (-> x name count (> 1))
-           (= "%" (-> x name first))
-           (let [i (-> x name (subs 1) int)]
+           (re-matches #"%[0-9]+" (name x))
+           (let [i (-> x name (subs 1) js/parseInt)]
              @(r/track result i)))
-
-      (and (number? x) x)
-
       x))
+
 
 (defn calc-input [n]
   [:input {:type 'text
            :value @(r/track input-n n)
-           :on-change #(emit [:set n (.-target.value %)])
+           :on-change #(emit [:set-calc n (.-target.value %)])
            :style {:font-family 'courier
                    :width "100%"}}])
 
 (defn calc-output [n]
-  (try
-    (let [val @(r/track result n)]
-      (cond
-        (string? val) [:code {:style {:color 'red}} val]
-        (some? val) [:code " = " (pr-str val)]))
-    (catch :default e
-      [:p {:style {:color 'red}}
-       "Error: " (.-message e)])))
-
-(defn calc-table []
-  [:table {:style {:width "100%"}}
-   [:tbody
-    (doall
-      (for [i (range @(r/track input-count))]
-        ^{:key i} [:tr
-                   [:td i]
-                   [:td [calc-input i]]
-                   [:td [calc-output i]]
-                   ;; [:td [:code @(r/track input-n i)]]
-                   ]))]])
+  (let [val @(r/track result n)]
+    (cond
+      (string? val) [:code {:style {:color 'red}} val]
+      (some? val)   [:code " = " (pr-str val)])))
 
 (defn calculations []
-  [:div
-   (pr-str @calcs)
-   [calc-table]])
+  [:table {:style {:width "100%"}}
+   [:tbody
+    (doall (for [i (range @(r/track input-count))]
+             ^{:key i} [:tr
+                        [:td i]
+                        [:td [calc-input i]]
+                        [:td [calc-output i]]]))]])
+
 
 (defn story-summary []
   [:div.demo-text

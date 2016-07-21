@@ -4,17 +4,13 @@
 (defmacro log
   "Print with console.log, if it exists."
   [& forms]
-  `(when reagent.debug.has-console
-     (.log js/console ~@forms)))
+  `(.log reagent.debug/console ~@forms))
 
 (defmacro warn
   "Print with console.warn."
   [& forms]
   (when *assert*
-    `(when reagent.debug.has-console
-       (.warn (if reagent.debug.tracking
-                reagent.debug.track-console js/console)
-              (str "Warning: " ~@forms)))))
+    `(.warn reagent.debug/console ~@forms)))
 
 (defmacro warn-unless
   [cond & forms]
@@ -26,15 +22,12 @@
   "Print with console.error."
   [& forms]
   (when *assert*
-    `(when reagent.debug.has-console
-       (.error (if reagent.debug.tracking
-                 reagent.debug.track-console js/console)
-               (str ~@forms)))))
+    `(.error reagent.debug/console ~@forms)))
 
 (defmacro println
   "Print string with console.log"
   [& forms]
-  `(log (str ~@forms)))
+  `(log ~@forms))
 
 (defmacro prn
   "Like standard prn, but prints using console.log (so that we get
@@ -71,3 +64,6 @@ as well as package name and line number. Returns x."
                   ~@forms)]
        (js/console.timeEnd label#)
        res#)))
+
+(defmacro with-tracked-warnings [& forms]
+  `(reagent.debug/track-warnings (fn [] ~@forms)))
