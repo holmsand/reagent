@@ -35,11 +35,11 @@
 
 (def last-exception nil)
 
-(defn exception [save e & msg]
-  (.warn console (apply str msg) e)
-  (.error console (or (.-stack e) e))
+(defn exception [save e msg]
   (when save
-    (set! last-exception e)))
+    (set! last-exception e))
+  (.error console msg e)
+  (.error console (or (.-stack e) e)))
 
 (defn clear-errors []
   (set! last-exception nil))

@@ -525,7 +525,7 @@
         (set! age gen)
         (let [n (or name "Reaction")]
           (d/exception (some? auto-run)
-                       e "Uncaught error in " (or name "Reaction")))
+                       e (str "Uncaught error in " (or name "Reaction"))))
         (->ReactionEx e))))
 
   (_maybe-notify [this old new shallow]
@@ -555,7 +555,7 @@
     (when (== age updating)
       (let [e (js/Error. recursion-error)]
         (set! state (->ReactionEx e))
-        (error e)
+        (d/exception false e "Recursion detected:")
         (throw e))))
 
   (_run-reactive [this fun]
@@ -614,6 +614,7 @@
     (notify-deref-watcher! this)
     (._check-error this)
     (._refresh this -1)
+    (._check-error this)
     state)
 
   IDisposable
