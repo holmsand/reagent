@@ -123,14 +123,14 @@
   (when-some [q ratom-queue]
     (set! ratom-queue nil)
     (dotimes [i (alength q)]
-      (._notify (aget q i))))
-  (d/report-errors))
+      (._notify (aget q i)))))
 
 (defn flush! []
   (try
     (flush-atoms)
     (finally
-      (set! flush-generation -1))))
+      (set! flush-generation -1)
+      (d/report-errors))))
 
 (set! batch/ratom-flush flush!)
 

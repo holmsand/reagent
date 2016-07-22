@@ -1,6 +1,8 @@
 (ns reagent.debug
   (:require-macros [reagent.debug]))
 
+(defonce inline-errors true)
+
 (deftype FakeConsole []
   Object
   (log [_])
@@ -36,10 +38,13 @@
 (def last-exception nil)
 
 (defn exception [save e msg]
-  (when save
-    (set! last-exception e))
-  (.error console msg e)
-  (.error console (or (.-stack e) e)))
+  (cond
+    (reagent.debug/dev?) (do
+                           (.warn console msg e)
+                           (when save
+                             (.error console (or (.-stack e) e))
+                             (set! last-exception e)))
+    save (.error console msg e)))
 
 (defn clear-errors []
   (set! last-exception nil))
@@ -48,3 +53,5 @@
   (when-some [e last-exception]
     (clear-errors)
     (throw e)))
+
+(defonce ^boolean has-dom false)

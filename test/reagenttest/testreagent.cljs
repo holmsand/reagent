@@ -932,19 +932,25 @@
                  (re-pattern (apply str s)))
             rend (fn [x]
                    (with-mounted-component x identity))]
-        (let [e (debug/track-warnings
+        (let [_ (set! debug/inline-errors false)
+              e (debug/track-warnings
                  #(is (thrown-with-msg?
                        :default (re "Invalid tag: 'div.' \\(" stack2 "\\)")
-                       (rend [comp2 [:div. "foo"]]))))]
-          (is (= e
-                 {:error (lstr "Error rendering component (" stack2 ")")})))
+                       (rend [comp2 [:div. "foo"]]))))
+              _ (set! debug/inline-errors true)
+              start (str "Error rendering component (" stack2 ")")]
+          (is (= (-> e :error first (subs 0 (count start)))
+                 start)))
 
-        (let [e (debug/track-warnings
+        (let [_ (set! debug/inline-errors false)
+              e (debug/track-warnings
                  #(is (thrown-with-msg?
                        :default (re "Invalid tag: 'div.' \\(" stack1 "\\)")
-                       (rend [comp1 [:div. "foo"]]))))]
-          (is (= e
-                 {:error (lstr "Error rendering component (" stack1 ")")})))
+                       (rend [comp1 [:div. "foo"]]))))
+              _ (set! debug/inline-errors true)
+              start (str "Error rendering component (" stack1 ")")]
+          (is (= (-> e :error first (subs 0 (count start)))
+                 start)))
 
         (let [e (debug/track-warnings #(r/as-element [nat]))]
           (is (re-find #"Using native React classes directly"

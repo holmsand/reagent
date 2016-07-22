@@ -3,7 +3,8 @@
             [reagent.impl.batching :as batch]
             [reagent.ratom :as ratom]
             [reagent.interop :refer-macros [$ $!]]
-            [reagent.debug :refer-macros [dbg prn dev? warn error warn-unless]]))
+            [reagent.debug :as d :refer-macros
+             [dbg prn dev? warn error warn-unless]]))
 
 (declare ^:dynamic *current-component*)
 
@@ -109,9 +110,37 @@
 
 (declare comp-name)
 
+(defn do-render-debug [c]
+  (try
+    (wrap-render c)
+    (catch :default e
+      (d/exception true e (str "Error rendering component"
+                               (comp-name)))
+      (as-element [:pre {:style {:position 'relative
+                                 :color 'white
+                                 :background-color 'black
+                                 :display 'block
+                                 :font-size 12
+                                 :line-height 1.2
+                                 :top 0
+                                 :left 0
+                                 :z-index 10000
+                                 :padding 12
+                                 :width 400}}
+                   (str "Error in "
+                        (or (some-> c .-constructor util/fun-name)
+                            "component")
+                        ": \n"
+                        e
+                        "\nSee console for details.")]))))
+
 (defn do-render [c]
   (binding [*current-component* c]
-    (if (dev?)
+    (cond
+      (and (dev?) d/inline-errors d/has-dom)
+      (do-render-debug c)
+
+      (dev?)
       ;; Log errors, without using try/catch (and mess up call stack)
       (let [ok (array false)]
         (try
@@ -122,7 +151,7 @@
             (when-not (aget ok 0)
               (error (str "Error rendering component"
                           (comp-name)))))))
-      (wrap-render c))))
+      :else (wrap-render c))))
 
 
 ;;; Method wrapping

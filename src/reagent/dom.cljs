@@ -3,7 +3,7 @@
             [reagent.impl.util :as util]
             [reagent.impl.template :as tmpl]
             [reagent.impl.batching :as batch]
-            [reagent.debug :refer-macros [dbg]]
+            [reagent.debug :as d :refer-macros [dbg]]
             [reagent.interop :refer-macros [$ $!]]))
 
 (defonce ^:private imported nil)
@@ -25,6 +25,7 @@
   ($ (module) unmountComponentAtNode container))
 
 (defn- render-comp [comp container callback]
+  (set! d/has-dom true)
   (binding [util/*always-update* true]
     (->> ($ (module) render (comp) container
             (fn []
