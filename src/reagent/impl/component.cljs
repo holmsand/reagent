@@ -112,7 +112,12 @@
 
 (defn do-render-debug [c]
   (try
-    (wrap-render c)
+    (let [result (wrap-render c)]
+      (when-not (or (nil? result)
+                    ($ util/react isValidElement result))
+        (throw (js/Error. (str "render must return nil or valid markup,\n"
+                               "not " (pr-str result)))))
+      result)
     (catch :default e
       (d/exception true e (str "Error rendering component"
                                (comp-name)))
