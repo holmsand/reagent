@@ -594,7 +594,7 @@
                   :else ^boolean (._refresh-watching this))]
       (if dirty
         (._run-refresh this (not (and (nil? *ratom-context*)
-                                      (nil? auto-run))))
+                                      (false? auto-run))))
         (set! age gen))
       false))
 
@@ -614,7 +614,6 @@
     (notify-deref-watcher! this)
     (._check-error this)
     (._refresh this -1)
-    (._check-error this)
     state)
 
   IDisposable

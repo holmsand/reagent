@@ -122,16 +122,16 @@
       (d/exception true e (str "Error rendering component"
                                (comp-name)))
       (as-element [:pre {:style {:position 'relative
-                                 :color 'white
-                                 :background-color 'black
                                  :display 'block
+                                 :background-color 'black
+                                 :color 'white
                                  :font-size 12
-                                 :line-height 1.2
-                                 :top 0
                                  :left 0
-                                 :z-index 10000
+                                 :line-height 1.2
                                  :padding 12
-                                 :width 400}}
+                                 :top 0
+                                 :width 400
+                                 :z-index 10000}}
                    (str "Error in "
                         (or (some-> c .-constructor util/fun-name)
                             "component")
